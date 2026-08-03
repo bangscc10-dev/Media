@@ -18,6 +18,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,8 +41,12 @@ fun SettingsScreen(
     onThemeChange: (ThemeMode) -> Unit,
     onFontScaleChange: (Float) -> Unit,
     onRescan: () -> Unit,
+    onOpenTerms: () -> Unit,
+    onOpenAbout: () -> Unit,
     onClose: () -> Unit
 ) {
+    val context = LocalContext.current
+    val privacyUrl = "https://bangscc10-dev.github.io/Media/privacy.html"
     Column(
         Modifier.fillMaxSize().background(MediaColors.Ink).statusBarsPadding()
             .verticalScroll(rememberScrollState())
@@ -74,8 +81,12 @@ fun SettingsScreen(
         RescanRow(onRescan)
 
         SectionLabel("About")
+        SettingRow(Icons.Outlined.Info, "About Media", null) { onOpenAbout() }
+        SettingRow(Icons.Outlined.Description, "Terms of Use", null) { onOpenTerms() }
+        SettingRow(Icons.Outlined.Shield, "Privacy Policy", null) {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(privacyUrl)))
+        }
         SettingRow(Icons.Outlined.Info, "Version", "1.0") {}
-        SettingRow(Icons.Outlined.Shield, "Privacy", null) {}
 
         Spacer(Modifier.height(40.dp))
         Text("Media", style = MaterialTheme.typography.displaySmall,

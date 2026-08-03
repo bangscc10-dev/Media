@@ -154,6 +154,8 @@ fun HomeScaffold(vm: PlayerViewModel) {
     var showLibrary by remember { mutableStateOf(false) }
     var libraryPillar by remember { mutableStateOf<Pillar?>(null) }
     var showAudiobooks by remember { mutableStateOf(false) }
+    var showTerms by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
     var reloadKey by remember { mutableStateOf(0) }
 
     val db = remember { OverrideDatabase.get(context) }
@@ -276,6 +278,8 @@ fun HomeScaffold(vm: PlayerViewModel) {
                 MediaRepository.refresh()
                 reloadKey++
             },
+            onOpenTerms = { showTerms = true },
+            onOpenAbout = { showAbout = true },
             onClose = { showSettings = false }
         )
     }
@@ -286,6 +290,12 @@ fun HomeScaffold(vm: PlayerViewModel) {
             onPlay = { idx -> vm.playOrToggle(podcasts, idx) },
             onClose = { showPodcasts = false }
         )
+    }
+    if (showTerms) {
+        TermsScreen(onClose = { showTerms = false })
+    }
+    if (showAbout) {
+        AboutScreen(version = "1.0", onClose = { showAbout = false })
     }
     if (showAudiobooks) {
         AudiobooksScreen(
