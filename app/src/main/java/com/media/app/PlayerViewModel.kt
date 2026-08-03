@@ -22,7 +22,8 @@ data class PlayerState(
     val isPlaying: Boolean = false,
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
-    val hasItem: Boolean = false
+    val hasItem: Boolean = false,
+    val currentUri: String? = null
 )
 
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
@@ -76,7 +77,8 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             isPlaying = c.isPlaying,
             positionMs = c.currentPosition,
             durationMs = c.duration.coerceAtLeast(0L),
-            hasItem = c.currentMediaItem != null
+            hasItem = c.currentMediaItem != null,
+            currentUri = c.currentMediaItem?.localConfiguration?.uri?.toString()
         )
     }
 
@@ -96,6 +98,16 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         c.setMediaItems(exoItems, startIndex, 0L)
         c.prepare()
         c.play()
+    }
+
+    fun playOrToggle(items: List<AppMediaItem>, startIndex: Int) {
+        val c = controller ?: return
+        val target = items[startIndex].uri.toString()
+        if (c.currentMediaItem?.localConfiguration?.uri?.toString() == target) {
+            if (c.isPlaying) c.pause() else c.play()
+        } else {
+            play(items, startIndex)
+        }
     }
 
     fun togglePlayPause() {

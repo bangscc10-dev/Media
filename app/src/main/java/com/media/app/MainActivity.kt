@@ -1,6 +1,7 @@
 package com.media.app
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -9,31 +10,45 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.border
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import android.app.Activity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.runtime.SideEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import androidx.media3.ui.PlayerView
 import com.google.common.util.concurrent.MoreExecutors
-import android.content.ComponentName
-import androidx.media3.session.SessionToken
 
 class MainActivity : ComponentActivity() {
     @UnstableApi
@@ -41,11 +56,23 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
+            SetLightStatusBar()
             MediaTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
+                Surface(Modifier.fillMaxSize(), color = MediaColors.Ink) {
                     AppRoot()
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SetLightStatusBar() {
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
         }
     }
 }
@@ -62,204 +89,352 @@ private fun requiredPermissions(): Array<String> =
 fun AppRoot(vm: PlayerViewModel = viewModel()) {
     val context = LocalContext.current
     var granted by remember {
-        mutableStateOf(
-            requiredPermissions().all {
-                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-            }
-        )
+        mutableStateOf(requiredPermissions().all {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        })
     }
-
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result -> granted = result.values.all { it } }
 
-    LaunchedEffect(Unit) {
-        if (!granted) launcher.launch(requiredPermissions())
-    }
+    LaunchedEffect(Unit) { if (!granted) launcher.launch(requiredPermissions()) }
 
     if (!granted) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Media needs permission to read your files", color = Color.White)
-                Spacer(Modifier.height(16.dp))
-                Button(onClick = { launcher.launch(requiredPermissions()) }) {
-                    Text("Grant access")
-                }
-            }
-        }
+        PermissionGate { launcher.launch(requiredPermissions()) }
         return
     }
-
-    MainScaffold(vm)
+    HomeScaffold(vm)
 }
 
-private enum class Tab(val label: String) { AUDIO("Audio"), VIDEO("Video") }
+@Composable
+private fun PermissionGate(onGrant: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(MediaColors.Ink), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(Space.xl)) {
+            Text("Media", style = MaterialTheme.typography.displaySmall, color = MediaColors.Cream)
+            Spacer(Modifier.height(Space.md))
+            Text(
+                "All your music, podcasts, video, and audiobooks in one home.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MediaColors.CreamDim
+            )
+            Spacer(Modifier.height(Space.xl))
+            Button(
+                onClick = onGrant,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MediaColors.Cream, contentColor = MediaColors.Ink
+                )
+            ) { Text("Grant access") }
+        }
+    }
+}
 
 @UnstableApi
 @Composable
-fun MainScaffold(vm: PlayerViewModel) {
+fun HomeScaffold(vm: PlayerViewModel) {
     val context = LocalContext.current
     val state by vm.state.collectAsState()
-    var tab by remember { mutableStateOf(Tab.AUDIO) }
     var showPlayer by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
+    var showPodcasts by remember { mutableStateOf(false) }
 
     val audio by remember { mutableStateOf(MediaRepository.loadAudio(context)) }
     val video by remember { mutableStateOf(MediaRepository.loadVideo(context)) }
-    val list = if (tab == Tab.AUDIO) audio else video
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                Tab.values().forEach { t ->
-                    NavigationBarItem(
-                        selected = tab == t,
-                        onClick = { tab = t },
-                        icon = {
-                            Icon(
-                                if (t == Tab.AUDIO) Icons.Filled.MusicNote else Icons.Filled.Movie,
-                                contentDescription = t.label
-                            )
-                        },
-                        label = { Text(t.label) }
-                    )
-                }
-            }
-        }
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
-            Text(
-                "Media",
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(16.dp)
-            )
-            LazyColumn(Modifier.weight(1f)) {
-                items(list) { item ->
-                    MediaRow(item) {
-                        val idx = list.indexOf(item)
-                        vm.play(list, idx)
-                        if (tab == Tab.VIDEO) showPlayer = true
+    Box(Modifier.fillMaxSize().background(MediaColors.Ink)) {
+        LazyColumn(
+            contentPadding = PaddingValues(bottom = 170.dp),
+            modifier = Modifier.fillMaxSize().statusBarsPadding()
+        ) {
+            item { HomeHeader(onSearch = { showSearch = true }, onAccount = { showSettings = true }) }
+
+            if (audio.isNotEmpty() || video.isNotEmpty()) {
+                item {
+                    ShelfHeader("Continue")
+                    val cont = (audio + video).take(6)
+                    MediaShelf(cont, state, large = true) { idx ->
+                        vm.playOrToggle(cont, idx)
+                        if (cont[idx].type == MediaType.VIDEO) showPlayer = true
                     }
                 }
             }
-            if (state.hasItem) {
-                NowPlayingBar(state, vm) { showPlayer = true }
+
+            item { Divider(color = MediaColors.InkHairline, modifier = Modifier.padding(horizontal = Space.xl)) }
+
+            if (audio.isNotEmpty()) {
+                item {
+                    ShelfHeader("Music")
+                    MediaShelf(audio, state) { idx -> vm.playOrToggle(audio, idx) }
+                }
+            }
+            if (video.isNotEmpty()) {
+                item {
+                    ShelfHeader("Video")
+                    MediaShelf(video, state, wide = true) { idx ->
+                        vm.playOrToggle(video, idx); showPlayer = true
+                    }
+                }
+            }
+
+            if (audio.isEmpty() && video.isEmpty()) {
+                item { EmptyState() }
             }
         }
+
+        if (state.hasItem) {
+            NowPlayingBar(
+                state, vm,
+                onExpand = { showPlayer = true },
+                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 66.dp, start = Space.md, end = Space.md)
+            )
+        }
+        BottomBar(Modifier.align(Alignment.BottomCenter)) { showPodcasts = true }
     }
 
     if (showPlayer) {
-        PlayerScreen(state, vm) { showPlayer = false }
+        FullPlayer(state, vm) { showPlayer = false }
     }
-}
-
-@Composable
-fun MediaRow(item: AppMediaItem, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp, 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            if (item.type == MediaType.AUDIO) Icons.Filled.MusicNote else Icons.Filled.Movie,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
+    if (showSearch) {
+        SearchScreen(
+            all = audio + video,
+            onPlay = { list, idx ->
+                vm.play(list, idx)
+                showSearch = false
+                if (list[idx].type == MediaType.VIDEO) showPlayer = true
+            },
+            onClose = { showSearch = false }
         )
-        Spacer(Modifier.width(16.dp))
-        Column(Modifier.weight(1f)) {
-            Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                item.artist,
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+    }
+    if (showSettings) {
+        SettingsScreen(
+            audioCount = audio.size,
+            videoCount = video.size,
+            onClose = { showSettings = false }
+        )
+    }
+    if (showPodcasts) {
+        PodcastsScreen(onClose = { showPodcasts = false })
+    }
+}
+
+@Composable
+private fun HomeHeader(onSearch: () -> Unit, onAccount: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(Space.xl, Space.xl, Space.xl, Space.sm),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("Media", style = MaterialTheme.typography.displaySmall, color = MediaColors.Cream)
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.lg)) {
+            Icon(Icons.Outlined.Search, "Search", tint = MediaColors.CreamDim,
+                modifier = Modifier.clickable(onClick = onSearch))
+            Icon(Icons.Outlined.AccountCircle, "You", tint = MediaColors.CreamDim,
+                modifier = Modifier.clickable(onClick = onAccount))
         }
     }
 }
 
 @Composable
-fun NowPlayingBar(state: PlayerState, vm: PlayerViewModel, onExpand: () -> Unit) {
+private fun ShelfHeader(title: String) {
     Row(
-        Modifier.fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-            .clickable(onClick = onExpand)
-            .padding(16.dp, 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+        Modifier.fillMaxWidth().padding(Space.xl, Space.lg, Space.xl, Space.xs),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Bottom
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(state.currentTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                state.currentArtist,
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray,
-                maxLines = 1
-            )
+        Text(title, style = MaterialTheme.typography.titleLarge, color = MediaColors.Cream)
+        Text("See all", style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamDim)
+    }
+}
+
+@Composable
+private fun MediaShelf(
+    items: List<AppMediaItem>,
+    state: PlayerState,
+    large: Boolean = false,
+    wide: Boolean = false,
+    onPlay: (Int) -> Unit
+) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = Space.xl, vertical = Space.md),
+        horizontalArrangement = Arrangement.spacedBy(Space.md)
+    ) {
+        items(items.size) { idx ->
+            val item = items[idx]
+            val isActive = state.currentUri == item.uri.toString()
+            MediaCard(item, large = large, wide = wide,
+                isPlaying = isActive && state.isPlaying) { onPlay(idx) }
         }
-        IconButton(onClick = { vm.togglePlayPause() }) {
-            Icon(
-                if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                contentDescription = "Play/Pause"
-            )
+    }
+}
+
+@Composable
+private fun MediaCard(
+    item: AppMediaItem,
+    large: Boolean,
+    wide: Boolean,
+    isPlaying: Boolean,
+    onClick: () -> Unit
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.96f else 1f, label = "press")
+
+    val artW = if (wide) 220.dp else if (large) 150.dp else 118.dp
+    val artH = if (wide) 124.dp else artW
+
+    Column(
+        Modifier
+            .width(artW)
+            .scale(scale)
+            .clickable(interaction, indication = null, onClick = onClick)
+    ) {
+        Box {
+            CoverArt(item, Modifier.width(artW).height(artH), corner = if (large || wide) 14 else 12)
+            Box(
+                Modifier.align(Alignment.BottomEnd).padding(Space.sm)
+                    .size(34.dp).clip(CircleShape).background(MediaColors.Cream),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    if (isPlaying) "Pause" else "Play",
+                    tint = MediaColors.Ink, modifier = Modifier.size(20.dp)
+                )
+            }
         }
+        Spacer(Modifier.height(Space.sm))
+        Text(item.title, style = MaterialTheme.typography.titleMedium, color = MediaColors.Cream,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(item.artist, style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamDim,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun EmptyState() {
+    Column(
+        Modifier.fillMaxWidth().padding(Space.xl, 80.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Nothing here yet", style = MaterialTheme.typography.titleLarge, color = MediaColors.Cream)
+        Spacer(Modifier.height(Space.sm))
+        Text("Add music or video to your device to see it here.",
+            style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamDim)
+    }
+}
+
+@Composable
+private fun NowPlayingBar(
+    state: PlayerState, vm: PlayerViewModel, onExpand: () -> Unit, modifier: Modifier = Modifier
+) {
+    Column(
+        modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+            .background(MediaColors.InkRaised).clickable(onClick = onExpand)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(Space.md, Space.sm),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(state.currentTitle, style = MaterialTheme.typography.titleMedium,
+                    color = MediaColors.Cream, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(state.currentArtist, style = MaterialTheme.typography.bodyMedium,
+                    color = MediaColors.CreamDim, maxLines = 1)
+            }
+            IconButton(onClick = { vm.togglePlayPause() }) {
+                Icon(
+                    if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    "Play/Pause", tint = MediaColors.Cream
+                )
+            }
+        }
+        val prog = if (state.durationMs > 0) state.positionMs.toFloat() / state.durationMs else 0f
+        LinearProgressIndicator(
+            progress = { prog.coerceIn(0f, 1f) },
+            modifier = Modifier.fillMaxWidth().height(2.dp),
+            color = MediaColors.Accent,
+            trackColor = MediaColors.InkHairline
+        )
+    }
+}
+
+@Composable
+private fun BottomBar(modifier: Modifier = Modifier, onPodcastsTab: () -> Unit) {
+    Column(
+        modifier.fillMaxWidth()
+            .background(MediaColors.Ink)
+            .border(width = 0.5.dp, color = MediaColors.InkHairline)
+            .navigationBarsPadding()
+    ) {
+        Row(
+            Modifier.fillMaxWidth().height(58.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            NavTab(Icons.Filled.Home, "Home", true) {}
+            NavTab(Icons.Outlined.LibraryBooks, "Library", false) {}
+            NavTab(Icons.Outlined.Podcasts, "Podcasts", false) { onPodcastsTab() }
+        }
+    }
+}
+
+@Composable
+private fun NavTab(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, active: Boolean, onClick: () -> Unit) {
+    val tint = if (active) MediaColors.Cream else MediaColors.CreamFaint
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Icon(icon, label, tint = tint, modifier = Modifier.size(20.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = tint)
     }
 }
 
 @UnstableApi
 @Composable
-fun PlayerScreen(state: PlayerState, vm: PlayerViewModel, onClose: () -> Unit) {
+private fun FullPlayer(state: PlayerState, vm: PlayerViewModel, onClose: () -> Unit) {
     val context = LocalContext.current
-
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(Modifier.fillMaxSize().background(MediaColors.Ink)) {
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     useController = false
+                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
                     val token = SessionToken(ctx, ComponentName(ctx, PlaybackService::class.java))
                     val future = MediaController.Builder(ctx, token).buildAsync()
-                    future.addListener({
-                        player = future.get()
-                    }, MoreExecutors.directExecutor())
+                    future.addListener({ player = future.get() }, MoreExecutors.directExecutor())
                 }
             },
             modifier = Modifier.fillMaxWidth().align(Alignment.Center)
         )
-
-        Column(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(24.dp)
-        ) {
-            Text(state.currentTitle, color = Color.White, style = MaterialTheme.typography.titleLarge)
-            Text(state.currentArtist, color = Color.Gray)
-            Spacer(Modifier.height(8.dp))
+        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(Space.xl, 40.dp)) {
+            Text(state.currentTitle, style = MaterialTheme.typography.titleLarge, color = MediaColors.Cream)
+            Text(state.currentArtist, style = MaterialTheme.typography.bodyLarge, color = MediaColors.CreamDim)
+            Spacer(Modifier.height(Space.md))
             if (state.durationMs > 0) {
                 Slider(
                     value = state.positionMs.toFloat().coerceIn(0f, state.durationMs.toFloat()),
                     onValueChange = { vm.seekTo(it.toLong()) },
-                    valueRange = 0f..state.durationMs.toFloat()
+                    valueRange = 0f..state.durationMs.toFloat(),
+                    colors = SliderDefaults.colors(
+                        thumbColor = MediaColors.Cream,
+                        activeTrackColor = MediaColors.Accent,
+                        inactiveTrackColor = MediaColors.InkHairline
+                    )
                 )
             }
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { vm.previous() }) {
-                    Icon(Icons.Filled.SkipPrevious, "Previous", tint = Color.White)
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceEvenly, Alignment.CenterVertically) {
+                IconButton({ vm.previous() }) { Icon(Icons.Filled.SkipPrevious, "Previous", tint = MediaColors.Cream, modifier = Modifier.size(32.dp)) }
+                IconButton({ vm.togglePlayPause() }) {
+                    Icon(if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, "Play/Pause",
+                        tint = MediaColors.Cream, modifier = Modifier.size(44.dp))
                 }
-                IconButton(onClick = { vm.togglePlayPause() }) {
-                    Icon(
-                        if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        "Play/Pause",
-                        tint = Color.White
-                    )
-                }
-                IconButton(onClick = { vm.next() }) {
-                    Icon(Icons.Filled.SkipNext, "Next", tint = Color.White)
-                }
+                IconButton({ vm.next() }) { Icon(Icons.Filled.SkipNext, "Next", tint = MediaColors.Cream, modifier = Modifier.size(32.dp)) }
             }
         }
-
-        IconButton(onClick = onClose, modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) {
-            Icon(Icons.Filled.KeyboardArrowDown, "Close", tint = Color.White)
+        IconButton(onClose, Modifier.align(Alignment.TopStart).padding(Space.sm)) {
+            Icon(Icons.Filled.KeyboardArrowDown, "Close", tint = MediaColors.Cream)
         }
     }
 }
