@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import android.widget.Toast
 import androidx.core.view.WindowCompat
 import android.app.Activity
 import androidx.compose.ui.platform.LocalView
@@ -143,6 +144,8 @@ fun HomeScaffold(vm: PlayerViewModel) {
     var showSearch by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showPodcasts by remember { mutableStateOf(false) }
+    var showLibrary by remember { mutableStateOf(false) }
+    var reloadKey by remember { mutableStateOf(0) }
 
     val db = remember { OverrideDatabase.get(context) }
     val scope = rememberCoroutineScope()
@@ -150,11 +153,11 @@ fun HomeScaffold(vm: PlayerViewModel) {
         db.dao().observeAll().map { list -> list.associateBy { it.mediaId } }
     }.collectAsState(initial = emptyMap())
 
-    val allAudio = remember(overrides) { MediaRepository.audioWithOverrides(context, overrides) }
+    val allAudio = remember(overrides, reloadKey) { MediaRepository.audioWithOverrides(context, overrides) }
     val music = remember(allAudio) { allAudio.filter { it.pillar == Pillar.MUSIC } }
     val podcasts = remember(allAudio) { allAudio.filter { it.pillar == Pillar.PODCAST } }
     val audiobooks = remember(allAudio) { allAudio.filter { it.pillar == Pillar.AUDIOBOOK } }
-    val video by remember { mutableStateOf(MediaRepository.loadVideo(context)) }
+    val video = remember(reloadKey) { MediaRepository.loadVideo(context) }
 
     // Edit sheet state
     var editItem by remember { mutableStateOf<AppMediaItem?>(null) }
@@ -218,7 +221,7 @@ fun HomeScaffold(vm: PlayerViewModel) {
                 modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 66.dp, start = Space.md, end = Space.md)
             )
         }
-        BottomBar(Modifier.align(Alignment.BottomCenter)) { showPodcasts = true }
+        BottomBar(Modifier.align(Alignment.BottomCenter), onLibraryTab = { showLibrary = true }) { showPodcasts = true }
     }
 
     if (showPlayer) {
@@ -239,6 +242,10 @@ fun HomeScaffold(vm: PlayerViewModel) {
         SettingsScreen(
             audioCount = allAudio.size,
             videoCount = video.size,
+            onRescan = {
+                MediaRepository.refresh()
+                reloadKey++
+            },
             onClose = { showSettings = false }
         )
     }
@@ -250,9 +257,22 @@ fun HomeScaffold(vm: PlayerViewModel) {
             onClose = { showPodcasts = false }
         )
     }
+    if (showLibrary) {
+        LibraryScreen(
+            all = allAudio + video,
+            state = state,
+            onPlay = { list, idx ->
+                vm.playOrToggle(list, idx)
+                if (list[idx].type == MediaType.VIDEO) showPlayer = true
+            },
+            onEdit = { editItem = it },
+            onClose = { showLibrary = false }
+        )
+    }
     editItem?.let { item ->
         EditSheet(
             item = item,
+            hasOverride = overrides.containsKey(item.id),
             onSave = { title, artist, details, pillar ->
                 scope.launch {
                     db.dao().upsert(
@@ -265,6 +285,10 @@ fun HomeScaffold(vm: PlayerViewModel) {
                         )
                     )
                 }
+                editItem = null
+            },
+            onReset = {
+                scope.launch { db.dao().delete(item.id) }
                 editItem = null
             },
             onDismiss = { editItem = null }
@@ -423,7 +447,7 @@ private fun NowPlayingBar(
 }
 
 @Composable
-private fun BottomBar(modifier: Modifier = Modifier, onPodcastsTab: () -> Unit) {
+private fun BottomBar(modifier: Modifier = Modifier, onLibraryTab: () -> Unit, onPodcastsTab: () -> Unit) {
     Column(
         modifier.fillMaxWidth()
             .background(MediaColors.Ink)
@@ -436,7 +460,7 @@ private fun BottomBar(modifier: Modifier = Modifier, onPodcastsTab: () -> Unit) 
             verticalAlignment = Alignment.CenterVertically
         ) {
             NavTab(Icons.Filled.Home, "Home", true) {}
-            NavTab(Icons.Outlined.LibraryBooks, "Library", false) {}
+            NavTab(Icons.Outlined.LibraryBooks, "Library", false) { onLibraryTab() }
             NavTab(Icons.Outlined.Podcasts, "Podcasts", false) { onPodcastsTab() }
         }
     }

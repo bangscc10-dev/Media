@@ -12,6 +12,14 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.CircularProgressIndicator
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,6 +30,7 @@ import androidx.compose.ui.unit.dp
 fun SettingsScreen(
     audioCount: Int,
     videoCount: Int,
+    onRescan: () -> Unit,
     onClose: () -> Unit
 ) {
     Column(
@@ -55,7 +64,7 @@ fun SettingsScreen(
 
         SectionLabel("Library")
         SettingRow(Icons.Outlined.Storage, "Storage", "$audioCount + $videoCount items") {}
-        SettingRow(Icons.Outlined.Refresh, "Rescan device", null) {}
+        RescanRow(onRescan)
 
         SectionLabel("About")
         SettingRow(Icons.Outlined.Info, "Version", "1.0") {}
@@ -68,6 +77,47 @@ fun SettingsScreen(
         Text("All your media. One home.",
             style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamFaint,
             modifier = Modifier.padding(start = Space.xl, bottom = 40.dp))
+    }
+}
+
+@Composable
+private fun RescanRow(onRescan: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var scanning by remember { mutableStateOf(false) }
+    var statusValue by remember { mutableStateOf<String?>(null) }
+
+    Row(
+        Modifier.fillMaxWidth()
+            .clickable(enabled = !scanning) {
+                scope.launch {
+                    scanning = true
+                    statusValue = "Scanning your media…"
+                    delay(900)           // let the scanning state be seen
+                    onRescan()
+                    statusValue = "Library updated"
+                    scanning = false
+                    delay(1600)
+                    statusValue = null
+                }
+            }
+            .padding(Space.xl, Space.md),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Outlined.Refresh, null, tint = MediaColors.CreamDim, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(Space.md))
+        Text("Rescan device", style = MaterialTheme.typography.bodyLarge, color = MediaColors.Cream,
+            modifier = Modifier.weight(1f))
+        if (scanning) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MediaColors.Accent
+            )
+            Spacer(Modifier.width(Space.sm))
+        }
+        if (statusValue != null) {
+            Text(statusValue!!, style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamDim)
+        } else {
+            Icon(Icons.Filled.ChevronRight, null, tint = MediaColors.CreamFaint, modifier = Modifier.size(18.dp))
+        }
     }
 }
 

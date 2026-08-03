@@ -24,7 +24,9 @@ private enum class PillarChoice(val label: String, val stored: String, val field
 @Composable
 fun EditSheet(
     item: AppMediaItem,
+    hasOverride: Boolean,
     onSave: (title: String, artist: String, details: String, pillar: String) -> Unit,
+    onReset: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -106,6 +108,19 @@ fun EditSheet(
             ) {
                 Text("Save", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = MediaColors.Cream)
+            }
+
+            if (hasOverride) {
+                Spacer(Modifier.height(Space.md))
+                Box(
+                    Modifier.fillMaxWidth()
+                        .clickable { onReset() }
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Reset to automatic",
+                        style = MaterialTheme.typography.bodyLarge, color = MediaColors.CreamDim)
+                }
             }
         }
     }
