@@ -157,6 +157,19 @@ fun HomeScaffold(vm: PlayerViewModel) {
     val db = remember { OverrideDatabase.get(context) }
     val scope = rememberCoroutineScope()
     val settings by SettingsStore.flow(context).collectAsState(initial = MediaSettings())
+
+    val recentHistory by remember {
+        db.historyDao().observeRecent(10)
+    }.collectAsState(initial = emptyList())
+
+    // Record a play (after 5s) into history; upsert = auto-dedup + move to front by timestamp.
+    LaunchedEffect(Unit) {
+        vm.onQualifyingPlay = { mediaId ->
+            scope.launch {
+                db.historyDao().record(PlayHistory(mediaId, System.currentTimeMillis()))
+            }
+        }
+    }
     val overrides by remember {
         db.dao().observeAll().map { list -> list.associateBy { it.mediaId } }
     }.collectAsState(initial = emptyMap())
@@ -170,6 +183,11 @@ fun HomeScaffold(vm: PlayerViewModel) {
     // Edit sheet state
     var editItem by remember { mutableStateOf<AppMediaItem?>(null) }
 
+    val continueItems = remember(recentHistory, music, podcasts, audiobooks, video) {
+        val byId = (music + podcasts + audiobooks + video).associateBy { it.id }
+        recentHistory.mapNotNull { byId[it.mediaId] }
+    }
+
     Box(Modifier.fillMaxSize().background(MediaColors.Ink)) {
         LazyColumn(
             contentPadding = PaddingValues(bottom = 170.dp),
@@ -177,13 +195,12 @@ fun HomeScaffold(vm: PlayerViewModel) {
         ) {
             item { HomeHeader(onSearch = { showSearch = true }, onAccount = { showSettings = true }) }
 
-            if (music.isNotEmpty() || podcasts.isNotEmpty() || audiobooks.isNotEmpty() || video.isNotEmpty()) {
+            if (continueItems.isNotEmpty()) {
                 item {
                     ShelfHeader("Continue")
-                    val cont = (music + podcasts + audiobooks + video).take(6)
-                    MediaShelf(cont, state, large = true, onEdit = { editItem = it }) { idx ->
-                        vm.playOrToggle(cont, idx)
-                        if (cont[idx].type == MediaType.VIDEO) showPlayer = true
+                    MediaShelf(continueItems, state, large = true, onEdit = { editItem = it }) { idx ->
+                        vm.playOrToggle(continueItems, idx)
+                        if (continueItems[idx].type == MediaType.VIDEO) showPlayer = true
                     }
                 }
             }

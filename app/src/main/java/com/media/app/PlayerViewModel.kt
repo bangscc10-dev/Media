@@ -30,12 +30,19 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     private var controller: MediaController? = null
 
+    // Set by the UI: called with the mediaId once it has played 5s (dedup handled by caller/DB).
+    var onQualifyingPlay: ((Long) -> Unit)? = null
+    private var recordedForCurrent = false
+
     private val _state = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = _state.asStateFlow()
 
     private val listener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) = refresh()
-        override fun onMediaItemTransition(mediaItem: ExoMediaItem?, reason: Int) = refresh()
+        override fun onMediaItemTransition(mediaItem: ExoMediaItem?, reason: Int) {
+            recordedForCurrent = false
+            refresh()
+        }
         override fun onPlaybackStateChanged(playbackState: Int) = refresh()
     }
 
@@ -61,6 +68,13 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                             positionMs = it.currentPosition,
                             durationMs = it.duration.coerceAtLeast(0L)
                         )
+                        if (!recordedForCurrent && it.currentPosition >= 5000L) {
+                            val id = it.currentMediaItem?.localConfiguration?.uri?.lastPathSegment?.toLongOrNull()
+                            if (id != null) {
+                                recordedForCurrent = true
+                                onQualifyingPlay?.invoke(id)
+                            }
+                        }
                     }
                 }
                 delay(500)
