@@ -18,6 +18,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
@@ -30,6 +34,9 @@ import androidx.compose.ui.unit.dp
 fun SettingsScreen(
     audioCount: Int,
     videoCount: Int,
+    settings: MediaSettings,
+    onThemeChange: (ThemeMode) -> Unit,
+    onFontScaleChange: (Float) -> Unit,
     onRescan: () -> Unit,
     onClose: () -> Unit
 ) {
@@ -59,8 +66,8 @@ fun SettingsScreen(
         }
 
         SectionLabel("Appearance")
-        SettingRow(Icons.Outlined.DarkMode, "Theme", "Dark") {}
-        SettingRow(Icons.Outlined.TextFields, "Display", "Editorial") {}
+        ThemePicker(settings.themeMode, onThemeChange)
+        FontSizePicker(settings.fontScale, onFontScaleChange)
 
         SectionLabel("Library")
         SettingRow(Icons.Outlined.Storage, "Storage", "$audioCount + $videoCount items") {}
@@ -117,6 +124,60 @@ private fun RescanRow(onRescan: () -> Unit) {
             Text(statusValue!!, style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamDim)
         } else {
             Icon(Icons.Filled.ChevronRight, null, tint = MediaColors.CreamFaint, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
+private fun ThemePicker(current: ThemeMode, onChange: (ThemeMode) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(Space.xl, Space.md)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.DarkMode, null, tint = MediaColors.CreamDim, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(Space.md))
+            Text("Theme", style = MaterialTheme.typography.bodyLarge, color = MediaColors.Cream)
+        }
+        Spacer(Modifier.height(Space.sm))
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+            listOf(ThemeMode.DARK to "Dark", ThemeMode.LIGHT to "Light", ThemeMode.SYSTEM to "System").forEach { (mode, label) ->
+                val sel = mode == current
+                Box(
+                    Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                        .background(if (sel) MediaColors.Cream else MediaColors.InkRaised)
+                        .border(0.5.dp, if (sel) MediaColors.Cream else MediaColors.InkHairline, RoundedCornerShape(10.dp))
+                        .clickable { onChange(mode) }.padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(label, style = MaterialTheme.typography.titleMedium,
+                        color = if (sel) MediaColors.OnInverse else MediaColors.CreamDim)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FontSizePicker(current: Float, onChange: (Float) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(Space.xl, Space.md)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.TextFields, null, tint = MediaColors.CreamDim, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(Space.md))
+            Text("Text size", style = MaterialTheme.typography.bodyLarge, color = MediaColors.Cream)
+        }
+        Spacer(Modifier.height(Space.sm))
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+            listOf(0.9f to "Compact", 1.0f to "Default", 1.15f to "Large").forEach { (scale, label) ->
+                val sel = kotlin.math.abs(scale - current) < 0.01f
+                Box(
+                    Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                        .background(if (sel) MediaColors.Cream else MediaColors.InkRaised)
+                        .border(0.5.dp, if (sel) MediaColors.Cream else MediaColors.InkHairline, RoundedCornerShape(10.dp))
+                        .clickable { onChange(scale) }.padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(label, style = MaterialTheme.typography.titleMedium,
+                        color = if (sel) MediaColors.OnInverse else MediaColors.CreamDim)
+                }
+            }
         }
     }
 }

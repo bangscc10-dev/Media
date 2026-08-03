@@ -63,8 +63,14 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
-            SetLightStatusBar()
-            MediaTheme {
+            val settings by SettingsStore.flow(this).collectAsState(initial = MediaSettings())
+            val dark = when (settings.themeMode) {
+                ThemeMode.LIGHT -> false
+                ThemeMode.SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
+                else -> true
+            }
+            SetStatusBarIcons(dark)
+            MediaTheme(themeMode = settings.themeMode, fontScale = settings.fontScale) {
                 Surface(Modifier.fillMaxSize(), color = MediaColors.Ink) {
                     AppRoot()
                 }
@@ -74,12 +80,13 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun SetLightStatusBar() {
+private fun SetStatusBarIcons(darkTheme: Boolean) {
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            // Dark theme -> light icons; Light theme -> dark icons
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
 }
@@ -149,6 +156,7 @@ fun HomeScaffold(vm: PlayerViewModel) {
 
     val db = remember { OverrideDatabase.get(context) }
     val scope = rememberCoroutineScope()
+    val settings by SettingsStore.flow(context).collectAsState(initial = MediaSettings())
     val overrides by remember {
         db.dao().observeAll().map { list -> list.associateBy { it.mediaId } }
     }.collectAsState(initial = emptyMap())
@@ -242,6 +250,9 @@ fun HomeScaffold(vm: PlayerViewModel) {
         SettingsScreen(
             audioCount = allAudio.size,
             videoCount = video.size,
+            settings = settings,
+            onThemeChange = { mode -> scope.launch { SettingsStore.setTheme(context, mode) } },
+            onFontScaleChange = { scale -> scope.launch { SettingsStore.setFontScale(context, scale) } },
             onRescan = {
                 MediaRepository.refresh()
                 reloadKey++

@@ -4,6 +4,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -13,79 +14,106 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// ---- Color tokens ----
+// ---- Semantic color tokens (resolved per theme) ----
+class Palette(
+    val bg: Color,          // background
+    val raised: Color,      // cards, sheets
+    val hairline: Color,    // dividers, borders
+    val text: Color,        // primary text
+    val textDim: Color,     // secondary
+    val textFaint: Color,   // tertiary / labels
+    val accent: Color,      // active state, progress
+    val onAccent: Color,    // text/icon on accent
+    val onInverse: Color    // e.g. icon on the cream play button
+)
+
+// Dark — the original editorial ink/cream
+val DarkPalette = Palette(
+    bg = Color(0xFF0B0B0F),
+    raised = Color(0xFF16161C),
+    hairline = Color(0xFF1C1C22),
+    text = Color(0xFFF4EFE6),
+    textDim = Color(0xFF9B968C),
+    textFaint = Color(0xFF6F6B63),
+    accent = Color(0xFF7C5CFF),
+    onAccent = Color(0xFFF4EFE6),
+    onInverse = Color(0xFF0B0B0F)
+)
+
+// Light — warm editorial paper, ink text. Restrained, not stark white.
+val LightPalette = Palette(
+    bg = Color(0xFFF7F3EC),        // warm paper
+    raised = Color(0xFFFFFFFF),    // clean card
+    hairline = Color(0xFFE4DED3),  // soft rule
+    text = Color(0xFF1A1814),      // near-black ink
+    textDim = Color(0xFF6B655B),   // warm grey
+    textFaint = Color(0xFF9C958A),
+    accent = Color(0xFF6A48E0),    // slightly deeper purple for contrast on light
+    onAccent = Color(0xFFFFFFFF),
+    onInverse = Color(0xFF1A1814)
+)
+
+// Current palette, provided via CompositionLocal so any composable can read it.
+val LocalPalette = androidx.compose.runtime.staticCompositionLocalOf { DarkPalette }
+
+// Back-compat shim: existing code references MediaColors.X — map to current palette.
 object MediaColors {
-    val Ink = Color(0xFF0B0B0F)          // background
-    val InkRaised = Color(0xFF16161C)     // cards, sheets
-    val InkHairline = Color(0xFF1C1C22)   // dividers, borders
-    val Cream = Color(0xFFF4EFE6)         // primary text
-    val CreamDim = Color(0xFF9B968C)      // secondary text
-    val CreamFaint = Color(0xFF6F6B63)    // tertiary / labels
-    val Accent = Color(0xFF7C5CFF)        // active state, progress ONLY
+    val Ink @Composable get() = LocalPalette.current.bg
+    val InkRaised @Composable get() = LocalPalette.current.raised
+    val InkHairline @Composable get() = LocalPalette.current.hairline
+    val Cream @Composable get() = LocalPalette.current.text
+    val CreamDim @Composable get() = LocalPalette.current.textDim
+    val CreamFaint @Composable get() = LocalPalette.current.textFaint
+    val Accent @Composable get() = LocalPalette.current.accent
+    val OnInverse @Composable get() = LocalPalette.current.onInverse
 }
 
-// ---- Typefaces ----
 val Fraunces = FontFamily(Font(R.font.fraunces_variable))
 val Inter = FontFamily(Font(R.font.inter_variable))
 
-// ---- Type scale ----
-val MediaTypography = Typography(
-    // Serif display — wordmark, big headers
-    displaySmall = TextStyle(
-        fontFamily = Fraunces, fontWeight = FontWeight.Medium,
-        fontSize = 26.sp, letterSpacing = (-0.5).sp
-    ),
-    // Serif — section / pillar headers
-    titleLarge = TextStyle(
-        fontFamily = Fraunces, fontWeight = FontWeight.Medium,
-        fontSize = 18.sp, letterSpacing = (-0.2).sp
-    ),
-    // Sans — card titles
-    titleMedium = TextStyle(
-        fontFamily = Inter, fontWeight = FontWeight.Medium,
-        fontSize = 13.sp
-    ),
-    // Sans — body
-    bodyLarge = TextStyle(
-        fontFamily = Inter, fontWeight = FontWeight.Normal,
-        fontSize = 15.sp
-    ),
-    // Sans — metadata, secondary
-    bodyMedium = TextStyle(
-        fontFamily = Inter, fontWeight = FontWeight.Normal,
-        fontSize = 11.5.sp
-    ),
-    // Sans — tiny labels
-    labelSmall = TextStyle(
-        fontFamily = Inter, fontWeight = FontWeight.Normal,
-        fontSize = 9.5.sp, letterSpacing = 0.3.sp
-    ),
+private fun typography(scale: Float) = Typography(
+    displaySmall = TextStyle(fontFamily = Fraunces, fontWeight = FontWeight.Medium,
+        fontSize = (26 * scale).sp, letterSpacing = (-0.5).sp),
+    titleLarge = TextStyle(fontFamily = Fraunces, fontWeight = FontWeight.Medium,
+        fontSize = (18 * scale).sp, letterSpacing = (-0.2).sp),
+    titleMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium,
+        fontSize = (13 * scale).sp),
+    bodyLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal,
+        fontSize = (15 * scale).sp),
+    bodyMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal,
+        fontSize = (11.5f * scale).sp),
+    labelSmall = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal,
+        fontSize = (9.5f * scale).sp, letterSpacing = 0.3.sp),
 )
 
-// ---- Spacing ----
 object Space {
-    val xs = 4.dp
-    val sm = 8.dp
-    val md = 12.dp
-    val lg = 16.dp
-    val xl = 22.dp
-    val xxl = 32.dp
+    val xs = 4.dp; val sm = 8.dp; val md = 12.dp
+    val lg = 16.dp; val xl = 22.dp; val xxl = 32.dp
 }
 
-private val MediaColorScheme = darkColorScheme(
-    primary = MediaColors.Accent,
-    background = MediaColors.Ink,
-    surface = MediaColors.InkRaised,
-    onBackground = MediaColors.Cream,
-    onSurface = MediaColors.Cream,
-    onPrimary = MediaColors.Ink,
-)
-
 @Composable
-fun MediaTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = MediaColorScheme,
-        typography = MediaTypography,
-        content = content
-    )
+fun MediaTheme(
+    themeMode: ThemeMode = ThemeMode.DARK,
+    fontScale: Float = 1.0f,
+    content: @Composable () -> Unit
+) {
+    val dark = when (themeMode) {
+        ThemeMode.DARK -> true
+        ThemeMode.LIGHT -> false
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    }
+    val palette = if (dark) DarkPalette else LightPalette
+    val scheme = if (dark) {
+        darkColorScheme(primary = palette.accent, background = palette.bg,
+            surface = palette.raised, onBackground = palette.text,
+            onSurface = palette.text, onPrimary = palette.onAccent)
+    } else {
+        lightColorScheme(primary = palette.accent, background = palette.bg,
+            surface = palette.raised, onBackground = palette.text,
+            onSurface = palette.text, onPrimary = palette.onAccent)
+    }
+
+    androidx.compose.runtime.CompositionLocalProvider(LocalPalette provides palette) {
+        MaterialTheme(colorScheme = scheme, typography = typography(fontScale), content = content)
+    }
 }
