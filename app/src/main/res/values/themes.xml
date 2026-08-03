@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Splash screen: cream bg, ink Fraunces M -->
+    <style name="Theme.Media.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_cream</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_signals_animated</item>
+        <item name="windowSplashScreenAnimationDuration">600</item>
+        <item name="postSplashScreenTheme">@style/Theme.Media</item>
+    </style>
+
     <style name="Theme.Media" parent="android:Theme.Material.NoActionBar">
         <item name="android:statusBarColor">@color/black</item>
         <item name="android:windowBackground">@color/black</item>

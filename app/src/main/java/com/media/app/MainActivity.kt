@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -60,6 +61,10 @@ import com.google.common.util.concurrent.MoreExecutors
 class MainActivity : ComponentActivity() {
     @UnstableApi
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splash = installSplashScreen()
+        var keep = true
+        splash.setKeepOnScreenCondition { keep }
+        window.decorView.postDelayed({ keep = false }, 850)
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
