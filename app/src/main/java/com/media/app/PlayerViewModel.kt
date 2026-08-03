@@ -23,7 +23,11 @@ data class PlayerState(
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
     val hasItem: Boolean = false,
-    val currentUri: String? = null
+    val currentUri: String? = null,
+    val shuffle: Boolean = false,
+    val repeatMode: Int = 0,   // Media3: 0=OFF, 1=ONE, 2=ALL
+    val speed: Float = 1.0f,
+    val isVideo: Boolean = false
 )
 
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
@@ -92,7 +96,11 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             positionMs = c.currentPosition,
             durationMs = c.duration.coerceAtLeast(0L),
             hasItem = c.currentMediaItem != null,
-            currentUri = c.currentMediaItem?.localConfiguration?.uri?.toString()
+            currentUri = c.currentMediaItem?.localConfiguration?.uri?.toString(),
+            shuffle = c.shuffleModeEnabled,
+            repeatMode = c.repeatMode,
+            speed = c.playbackParameters.speed,
+            isVideo = c.currentMediaItem?.localConfiguration?.uri?.toString()?.contains("/video/") == true
         )
     }
 
@@ -155,6 +163,34 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     fun seekTo(ms: Long) { controller?.seekTo(ms) }
     fun next() { controller?.seekToNext() }
     fun previous() { controller?.seekToPrevious() }
+
+    fun toggleShuffle() {
+        val c = controller ?: return
+        c.shuffleModeEnabled = !c.shuffleModeEnabled
+        refresh()
+    }
+
+    fun cycleRepeat() {
+        val c = controller ?: return
+        c.repeatMode = when (c.repeatMode) {
+            androidx.media3.common.Player.REPEAT_MODE_OFF -> androidx.media3.common.Player.REPEAT_MODE_ALL
+            androidx.media3.common.Player.REPEAT_MODE_ALL -> androidx.media3.common.Player.REPEAT_MODE_ONE
+            else -> androidx.media3.common.Player.REPEAT_MODE_OFF
+        }
+        refresh()
+    }
+
+    fun cycleSpeed() {
+        val c = controller ?: return
+        val next = when {
+            c.playbackParameters.speed < 1.1f -> 1.25f
+            c.playbackParameters.speed < 1.4f -> 1.5f
+            c.playbackParameters.speed < 1.9f -> 2.0f
+            else -> 1.0f
+        }
+        c.setPlaybackSpeed(next)
+        refresh()
+    }
 
     override fun onCleared() {
         controller?.removeListener(listener)

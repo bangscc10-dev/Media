@@ -542,46 +542,141 @@ private fun NavTab(icon: androidx.compose.ui.graphics.vector.ImageVector, label:
 @Composable
 private fun FullPlayer(state: PlayerState, vm: PlayerViewModel, onClose: () -> Unit) {
     val context = LocalContext.current
-    Box(Modifier.fillMaxSize().background(MediaColors.Ink)) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    useController = false
-                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                    val token = SessionToken(ctx, ComponentName(ctx, PlaybackService::class.java))
-                    val future = MediaController.Builder(ctx, token).buildAsync()
-                    future.addListener({ player = future.get() }, MoreExecutors.directExecutor())
-                }
-            },
-            modifier = Modifier.fillMaxWidth().align(Alignment.Center)
+
+    // Lightweight item to drive CoverArt from the current URI.
+    val artItem = state.currentUri?.let { uri ->
+        AppMediaItem(
+            id = uri.substringAfterLast('/').toLongOrNull() ?: 0L,
+            title = state.currentTitle, artist = state.currentArtist,
+            durationMs = state.durationMs, uri = android.net.Uri.parse(uri),
+            type = if (state.isVideo) MediaType.VIDEO else MediaType.AUDIO,
+            pillar = Pillar.MUSIC
         )
-        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(Space.xl, 40.dp)) {
-            Text(state.currentTitle, style = MaterialTheme.typography.titleLarge, color = MediaColors.Cream)
-            Text(state.currentArtist, style = MaterialTheme.typography.bodyLarge, color = MediaColors.CreamDim)
-            Spacer(Modifier.height(Space.md))
-            if (state.durationMs > 0) {
-                Slider(
-                    value = state.positionMs.toFloat().coerceIn(0f, state.durationMs.toFloat()),
-                    onValueChange = { vm.seekTo(it.toLong()) },
-                    valueRange = 0f..state.durationMs.toFloat(),
-                    colors = SliderDefaults.colors(
-                        thumbColor = MediaColors.Cream,
-                        activeTrackColor = MediaColors.Accent,
-                        inactiveTrackColor = MediaColors.InkHairline
-                    )
-                )
-            }
-            Row(Modifier.fillMaxWidth(), Arrangement.SpaceEvenly, Alignment.CenterVertically) {
-                IconButton({ vm.previous() }) { Icon(Icons.Filled.SkipPrevious, "Previous", tint = MediaColors.Cream, modifier = Modifier.size(32.dp)) }
-                IconButton({ vm.togglePlayPause() }) {
-                    Icon(if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, "Play/Pause",
-                        tint = MediaColors.Cream, modifier = Modifier.size(44.dp))
+    }
+
+    Box(Modifier.fillMaxSize().background(MediaColors.Ink)) {
+        Column(Modifier.fillMaxSize()) {
+            // Top bar with close — its own row, always tappable
+            Row(
+                Modifier.fillMaxWidth().statusBarsPadding().padding(Space.sm, Space.sm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClose) {
+                    Icon(Icons.Filled.KeyboardArrowDown, "Close", tint = MediaColors.Cream,
+                        modifier = Modifier.size(28.dp))
                 }
-                IconButton({ vm.next() }) { Icon(Icons.Filled.SkipNext, "Next", tint = MediaColors.Cream, modifier = Modifier.size(32.dp)) }
+                Spacer(Modifier.weight(1f))
+                Text(if (state.isVideo) "Now playing" else "Now playing",
+                    style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamFaint)
+                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.size(48.dp))
             }
-        }
-        IconButton(onClose, Modifier.align(Alignment.TopStart).padding(Space.sm)) {
-            Icon(Icons.Filled.KeyboardArrowDown, "Close", tint = MediaColors.Cream)
+
+            // Hero: video surface for video, big cover art for audio
+            Box(
+                Modifier.fillMaxWidth().weight(1f).padding(Space.xl, Space.md),
+                contentAlignment = Alignment.Center
+            ) {
+                if (state.isVideo) {
+                    AndroidView(
+                        factory = { ctx ->
+                            PlayerView(ctx).apply {
+                                useController = false
+                                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                                val token = SessionToken(ctx, ComponentName(ctx, PlaybackService::class.java))
+                                val future = MediaController.Builder(ctx, token).buildAsync()
+                                future.addListener({ player = future.get() }, MoreExecutors.directExecutor())
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else if (artItem != null) {
+                    CoverArt(artItem, Modifier.fillMaxWidth().aspectRatio(1f), corner = 18)
+                }
+            }
+
+            // Title block — serif title, editorial
+            Column(Modifier.fillMaxWidth().padding(Space.xl, 0.dp, Space.xl, Space.md)) {
+                Text(state.currentTitle, style = MaterialTheme.typography.titleLarge,
+                    color = MediaColors.Cream, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(state.currentArtist, style = MaterialTheme.typography.bodyLarge,
+                    color = MediaColors.CreamDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+
+            // Scrubber with time labels
+            Column(Modifier.fillMaxWidth().padding(Space.xl, 0.dp)) {
+                if (state.durationMs > 0) {
+                    Slider(
+                        value = state.positionMs.toFloat().coerceIn(0f, state.durationMs.toFloat()),
+                        onValueChange = { vm.seekTo(it.toLong()) },
+                        valueRange = 0f..state.durationMs.toFloat(),
+                        colors = SliderDefaults.colors(
+                            thumbColor = MediaColors.Cream,
+                            activeTrackColor = MediaColors.Accent,
+                            inactiveTrackColor = MediaColors.InkHairline
+                        )
+                    )
+                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                        Text(fmtTime(state.positionMs), style = MaterialTheme.typography.labelSmall, color = MediaColors.CreamFaint)
+                        Text(fmtTime(state.durationMs), style = MaterialTheme.typography.labelSmall, color = MediaColors.CreamFaint)
+                    }
+                }
+            }
+
+            // Primary transport
+            Row(
+                Modifier.fillMaxWidth().padding(Space.xl, Space.md),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton({ vm.previous() }) { Icon(Icons.Filled.SkipPrevious, "Previous", tint = MediaColors.Cream, modifier = Modifier.size(34.dp)) }
+                Box(
+                    Modifier.size(64.dp).clip(CircleShape).background(MediaColors.Cream)
+                        .clickable { vm.togglePlayPause() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, "Play/Pause",
+                        tint = MediaColors.OnInverse, modifier = Modifier.size(34.dp))
+                }
+                IconButton({ vm.next() }) { Icon(Icons.Filled.SkipNext, "Next", tint = MediaColors.Cream, modifier = Modifier.size(34.dp)) }
+            }
+
+            // Secondary row: shuffle / repeat / speed
+            Row(
+                Modifier.fillMaxWidth().navigationBarsPadding().padding(Space.xl, 0.dp, Space.xl, Space.xl),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton({ vm.toggleShuffle() }) {
+                    Icon(Icons.Filled.Shuffle, "Shuffle",
+                        tint = if (state.shuffle) MediaColors.Accent else MediaColors.CreamDim,
+                        modifier = Modifier.size(22.dp))
+                }
+                IconButton({ vm.cycleRepeat() }) {
+                    Icon(
+                        if (state.repeatMode == 1) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                        "Repeat",
+                        tint = if (state.repeatMode != 0) MediaColors.Accent else MediaColors.CreamDim,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Box(
+                    Modifier.clip(RoundedCornerShape(8.dp)).clickable { vm.cycleSpeed() }
+                        .padding(horizontal = Space.md, vertical = Space.xs),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("${state.speed}x".replace(".0x", "x"),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (state.speed != 1.0f) MediaColors.Accent else MediaColors.CreamDim)
+                }
+            }
         }
     }
+}
+
+private fun fmtTime(ms: Long): String {
+    val totalSec = (ms / 1000).toInt()
+    val m = totalSec / 60
+    val sec = totalSec % 60
+    return "%d:%02d".format(m, sec)
 }
