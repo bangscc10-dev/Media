@@ -152,6 +152,8 @@ fun HomeScaffold(vm: PlayerViewModel) {
     var showSettings by remember { mutableStateOf(false) }
     var showPodcasts by remember { mutableStateOf(false) }
     var showLibrary by remember { mutableStateOf(false) }
+    var libraryPillar by remember { mutableStateOf<Pillar?>(null) }
+    var showAudiobooks by remember { mutableStateOf(false) }
     var reloadKey by remember { mutableStateOf(0) }
 
     val db = remember { OverrideDatabase.get(context) }
@@ -209,25 +211,25 @@ fun HomeScaffold(vm: PlayerViewModel) {
 
             if (music.isNotEmpty()) {
                 item {
-                    ShelfHeader("Music")
+                    ShelfHeader("Music", onSeeAll = { libraryPillar = Pillar.MUSIC; showLibrary = true })
                     MediaShelf(music, state, onEdit = { editItem = it }) { idx -> vm.playOrToggle(music, idx) }
                 }
             }
             if (podcasts.isNotEmpty()) {
                 item {
-                    ShelfHeader("Podcasts")
+                    ShelfHeader("Podcasts", onSeeAll = { libraryPillar = Pillar.PODCAST; showLibrary = true })
                     MediaShelf(podcasts, state, onEdit = { editItem = it }) { idx -> vm.playOrToggle(podcasts, idx) }
                 }
             }
             if (audiobooks.isNotEmpty()) {
                 item {
-                    ShelfHeader("Audiobooks")
+                    ShelfHeader("Audiobooks", onSeeAll = { libraryPillar = Pillar.AUDIOBOOK; showLibrary = true })
                     MediaShelf(audiobooks, state, onEdit = { editItem = it }) { idx -> vm.playOrToggle(audiobooks, idx) }
                 }
             }
             if (video.isNotEmpty()) {
                 item {
-                    ShelfHeader("Video")
+                    ShelfHeader("Video", onSeeAll = { libraryPillar = Pillar.VIDEO; showLibrary = true })
                     MediaShelf(video, state, wide = true, onEdit = { editItem = it }) { idx ->
                         vm.playOrToggle(video, idx); showPlayer = true
                     }
@@ -246,7 +248,7 @@ fun HomeScaffold(vm: PlayerViewModel) {
                 modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 66.dp, start = Space.md, end = Space.md)
             )
         }
-        BottomBar(Modifier.align(Alignment.BottomCenter), onLibraryTab = { showLibrary = true }) { showPodcasts = true }
+        BottomBar(Modifier.align(Alignment.BottomCenter), onLibraryTab = { showLibrary = true }, onPodcastsTab = { showPodcasts = true }) { showAudiobooks = true }
     }
 
     if (showPlayer) {
@@ -285,16 +287,25 @@ fun HomeScaffold(vm: PlayerViewModel) {
             onClose = { showPodcasts = false }
         )
     }
+    if (showAudiobooks) {
+        AudiobooksScreen(
+            audiobooks = audiobooks,
+            state = state,
+            onPlay = { idx -> vm.playOrToggle(audiobooks, idx) },
+            onClose = { showAudiobooks = false }
+        )
+    }
     if (showLibrary) {
         LibraryScreen(
             all = allAudio + video,
             state = state,
+            initialPillar = libraryPillar,
             onPlay = { list, idx ->
                 vm.playOrToggle(list, idx)
                 if (list[idx].type == MediaType.VIDEO) showPlayer = true
             },
             onEdit = { editItem = it },
-            onClose = { showLibrary = false }
+            onClose = { showLibrary = false; libraryPillar = null }
         )
     }
     editItem?.let { item ->
@@ -344,14 +355,17 @@ private fun HomeHeader(onSearch: () -> Unit, onAccount: () -> Unit) {
 }
 
 @Composable
-private fun ShelfHeader(title: String) {
+private fun ShelfHeader(title: String, onSeeAll: (() -> Unit)? = null) {
     Row(
         Modifier.fillMaxWidth().padding(Space.xl, Space.lg, Space.xl, Space.xs),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Bottom
     ) {
         Text(title, style = MaterialTheme.typography.titleLarge, color = MediaColors.Cream)
-        Text("See all", style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamDim)
+        if (onSeeAll != null) {
+            Text("See all", style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamDim,
+                modifier = Modifier.clickable(onClick = onSeeAll))
+        }
     }
 }
 
@@ -425,6 +439,10 @@ private fun MediaCard(
             maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(item.artist, style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamDim,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (!item.details.isNullOrBlank()) {
+            Text(item.details, style = MaterialTheme.typography.bodyMedium,
+                color = MediaColors.CreamFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 
@@ -477,7 +495,7 @@ private fun NowPlayingBar(
 }
 
 @Composable
-private fun BottomBar(modifier: Modifier = Modifier, onLibraryTab: () -> Unit, onPodcastsTab: () -> Unit) {
+private fun BottomBar(modifier: Modifier = Modifier, onLibraryTab: () -> Unit, onPodcastsTab: () -> Unit, onAudiobooksTab: () -> Unit) {
     Column(
         modifier.fillMaxWidth()
             .background(MediaColors.Ink)
@@ -492,6 +510,7 @@ private fun BottomBar(modifier: Modifier = Modifier, onLibraryTab: () -> Unit, o
             NavTab(Icons.Filled.Home, "Home", true) {}
             NavTab(Icons.Outlined.LibraryBooks, "Library", false) { onLibraryTab() }
             NavTab(Icons.Outlined.Podcasts, "Podcasts", false) { onPodcastsTab() }
+            NavTab(Icons.Outlined.MenuBook, "Audiobooks", false) { onAudiobooksTab() }
         }
     }
 }

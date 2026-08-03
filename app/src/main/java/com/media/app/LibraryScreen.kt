@@ -32,11 +32,16 @@ private enum class LibFilter(val label: String, val pillar: Pillar?) {
 fun LibraryScreen(
     all: List<AppMediaItem>,
     state: PlayerState,
+    initialPillar: Pillar? = null,
     onPlay: (List<AppMediaItem>, Int) -> Unit,
     onEdit: (AppMediaItem) -> Unit,
     onClose: () -> Unit
 ) {
-    var filter by remember { mutableStateOf(LibFilter.ALL) }
+    var filter by remember {
+        mutableStateOf(
+            LibFilter.values().firstOrNull { it.pillar == initialPillar } ?: LibFilter.ALL
+        )
+    }
     val shown = remember(filter, all) {
         if (filter.pillar == null) all else all.filter { it.pillar == filter.pillar }
     }
