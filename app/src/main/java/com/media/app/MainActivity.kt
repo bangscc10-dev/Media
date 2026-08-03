@@ -8,6 +8,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.result.contract.ActivityResultContracts
@@ -202,6 +203,15 @@ fun HomeScaffold(vm: PlayerViewModel) {
 
     // Edit sheet state
     var editItem by remember { mutableStateOf<AppMediaItem?>(null) }
+
+    // Android back: close the topmost open overlay, step by step.
+    BackHandler(enabled = editItem != null) { editItem = null }
+    BackHandler(enabled = editItem == null && showPlayer) { showPlayer = false }
+    BackHandler(enabled = editItem == null && !showPlayer && showSearch) { showSearch = false }
+    BackHandler(enabled = editItem == null && !showPlayer && !showSearch && showSettings) { showSettings = false }
+    BackHandler(enabled = editItem == null && !showPlayer && !showSearch && !showSettings && showLibrary) { showLibrary = false; libraryPillar = null }
+    BackHandler(enabled = editItem == null && !showPlayer && !showSearch && !showSettings && !showLibrary && showPodcasts) { showPodcasts = false }
+    BackHandler(enabled = editItem == null && !showPlayer && !showSearch && !showSettings && !showLibrary && !showPodcasts && showAudiobooks) { showAudiobooks = false }
 
     val continueItems = remember(recentHistory, music, podcasts, audiobooks, video) {
         val byId = (music + podcasts + audiobooks + video).associateBy { it.id }
