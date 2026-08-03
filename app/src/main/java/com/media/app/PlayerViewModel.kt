@@ -110,6 +110,29 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // Update the live session metadata for the current item (after a user edit),
+    // so notification / lock screen / mini-player refresh instantly.
+    fun updateCurrentMetadata(mediaId: Long, title: String, artist: String) {
+        val c = controller ?: return
+        val current = c.currentMediaItem ?: return
+        // Match by the id embedded in the uri (last path segment)
+        val currentId = current.localConfiguration?.uri?.lastPathSegment?.toLongOrNull()
+        if (currentId != mediaId) return
+
+        val newMeta = MediaMetadata.Builder()
+            .setTitle(title)
+            .setArtist(artist)
+            .build()
+        val updated = current.buildUpon().setMediaMetadata(newMeta).build()
+        val idx = c.currentMediaItemIndex
+        val pos = c.currentPosition
+        val wasPlaying = c.isPlaying
+        c.replaceMediaItem(idx, updated)
+        c.seekTo(idx, pos)
+        if (wasPlaying) c.play()
+        refresh()
+    }
+
     fun togglePlayPause() {
         val c = controller ?: return
         if (c.isPlaying) c.pause() else c.play()

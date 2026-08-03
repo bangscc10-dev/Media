@@ -11,3 +11,7 @@
 *.apk
 *.keystore
 !debug.keystore
+
+# Signing — NEVER commit
+media-release.keystore
+keystore.properties

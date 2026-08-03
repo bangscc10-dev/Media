@@ -285,6 +285,8 @@ fun HomeScaffold(vm: PlayerViewModel) {
                         )
                     )
                 }
+                // Push edit into the live playback session if this item is playing now
+                vm.updateCurrentMetadata(item.id, title, artist)
                 editItem = null
             },
             onReset = {
