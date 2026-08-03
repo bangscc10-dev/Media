@@ -90,8 +90,19 @@ private fun SetStatusBarIcons(darkTheme: Boolean) {
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            // Dark theme -> light icons; Light theme -> dark icons
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            // Draw behind system bars
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            // Fully transparent bars so our app background fills edge-to-edge
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
+            // Remove the forced contrast scrim the system draws on the nav bar (API 29+)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                window.isNavigationBarContrastEnforced = false
+            }
+            val controller = WindowCompat.getInsetsController(window, view)
+            // Dark theme -> light icons on both bars; Light theme -> dark icons
+            controller.isAppearanceLightStatusBars = !darkTheme
+            controller.isAppearanceLightNavigationBars = !darkTheme
         }
     }
 }
