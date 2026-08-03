@@ -13,6 +13,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -44,6 +46,10 @@ import android.app.Activity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.SideEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -138,8 +144,20 @@ fun HomeScaffold(vm: PlayerViewModel) {
     var showSettings by remember { mutableStateOf(false) }
     var showPodcasts by remember { mutableStateOf(false) }
 
-    val audio by remember { mutableStateOf(MediaRepository.loadAudio(context)) }
+    val db = remember { OverrideDatabase.get(context) }
+    val scope = rememberCoroutineScope()
+    val overrides by remember {
+        db.dao().observeAll().map { list -> list.associateBy { it.mediaId } }
+    }.collectAsState(initial = emptyMap())
+
+    val allAudio = remember(overrides) { MediaRepository.audioWithOverrides(context, overrides) }
+    val music = remember(allAudio) { allAudio.filter { it.pillar == Pillar.MUSIC } }
+    val podcasts = remember(allAudio) { allAudio.filter { it.pillar == Pillar.PODCAST } }
+    val audiobooks = remember(allAudio) { allAudio.filter { it.pillar == Pillar.AUDIOBOOK } }
     val video by remember { mutableStateOf(MediaRepository.loadVideo(context)) }
+
+    // Edit sheet state
+    var editItem by remember { mutableStateOf<AppMediaItem?>(null) }
 
     Box(Modifier.fillMaxSize().background(MediaColors.Ink)) {
         LazyColumn(
@@ -148,11 +166,11 @@ fun HomeScaffold(vm: PlayerViewModel) {
         ) {
             item { HomeHeader(onSearch = { showSearch = true }, onAccount = { showSettings = true }) }
 
-            if (audio.isNotEmpty() || video.isNotEmpty()) {
+            if (music.isNotEmpty() || podcasts.isNotEmpty() || audiobooks.isNotEmpty() || video.isNotEmpty()) {
                 item {
                     ShelfHeader("Continue")
-                    val cont = (audio + video).take(6)
-                    MediaShelf(cont, state, large = true) { idx ->
+                    val cont = (music + podcasts + audiobooks + video).take(6)
+                    MediaShelf(cont, state, large = true, onEdit = { editItem = it }) { idx ->
                         vm.playOrToggle(cont, idx)
                         if (cont[idx].type == MediaType.VIDEO) showPlayer = true
                     }
@@ -161,22 +179,34 @@ fun HomeScaffold(vm: PlayerViewModel) {
 
             item { Divider(color = MediaColors.InkHairline, modifier = Modifier.padding(horizontal = Space.xl)) }
 
-            if (audio.isNotEmpty()) {
+            if (music.isNotEmpty()) {
                 item {
                     ShelfHeader("Music")
-                    MediaShelf(audio, state) { idx -> vm.playOrToggle(audio, idx) }
+                    MediaShelf(music, state, onEdit = { editItem = it }) { idx -> vm.playOrToggle(music, idx) }
+                }
+            }
+            if (podcasts.isNotEmpty()) {
+                item {
+                    ShelfHeader("Podcasts")
+                    MediaShelf(podcasts, state, onEdit = { editItem = it }) { idx -> vm.playOrToggle(podcasts, idx) }
+                }
+            }
+            if (audiobooks.isNotEmpty()) {
+                item {
+                    ShelfHeader("Audiobooks")
+                    MediaShelf(audiobooks, state, onEdit = { editItem = it }) { idx -> vm.playOrToggle(audiobooks, idx) }
                 }
             }
             if (video.isNotEmpty()) {
                 item {
                     ShelfHeader("Video")
-                    MediaShelf(video, state, wide = true) { idx ->
+                    MediaShelf(video, state, wide = true, onEdit = { editItem = it }) { idx ->
                         vm.playOrToggle(video, idx); showPlayer = true
                     }
                 }
             }
 
-            if (audio.isEmpty() && video.isEmpty()) {
+            if (music.isEmpty() && podcasts.isEmpty() && audiobooks.isEmpty() && video.isEmpty()) {
                 item { EmptyState() }
             }
         }
@@ -196,7 +226,7 @@ fun HomeScaffold(vm: PlayerViewModel) {
     }
     if (showSearch) {
         SearchScreen(
-            all = audio + video,
+            all = allAudio + video,
             onPlay = { list, idx ->
                 vm.play(list, idx)
                 showSearch = false
@@ -207,13 +237,38 @@ fun HomeScaffold(vm: PlayerViewModel) {
     }
     if (showSettings) {
         SettingsScreen(
-            audioCount = audio.size,
+            audioCount = allAudio.size,
             videoCount = video.size,
             onClose = { showSettings = false }
         )
     }
     if (showPodcasts) {
-        PodcastsScreen(onClose = { showPodcasts = false })
+        PodcastsScreen(
+            podcasts = podcasts,
+            state = state,
+            onPlay = { idx -> vm.playOrToggle(podcasts, idx) },
+            onClose = { showPodcasts = false }
+        )
+    }
+    editItem?.let { item ->
+        EditSheet(
+            item = item,
+            onSave = { title, artist, details, pillar ->
+                scope.launch {
+                    db.dao().upsert(
+                        MediaOverride(
+                            mediaId = item.id,
+                            customTitle = title,
+                            customArtist = artist,
+                            details = details,
+                            pillar = pillar
+                        )
+                    )
+                }
+                editItem = null
+            },
+            onDismiss = { editItem = null }
+        )
     }
 }
 
@@ -252,6 +307,7 @@ private fun MediaShelf(
     state: PlayerState,
     large: Boolean = false,
     wide: Boolean = false,
+    onEdit: (AppMediaItem) -> Unit,
     onPlay: (Int) -> Unit
 ) {
     LazyRow(
@@ -262,17 +318,20 @@ private fun MediaShelf(
             val item = items[idx]
             val isActive = state.currentUri == item.uri.toString()
             MediaCard(item, large = large, wide = wide,
-                isPlaying = isActive && state.isPlaying) { onPlay(idx) }
+                isPlaying = isActive && state.isPlaying,
+                onLongPress = { onEdit(item) }) { onPlay(idx) }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MediaCard(
     item: AppMediaItem,
     large: Boolean,
     wide: Boolean,
     isPlaying: Boolean,
+    onLongPress: () -> Unit,
     onClick: () -> Unit
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -286,7 +345,12 @@ private fun MediaCard(
         Modifier
             .width(artW)
             .scale(scale)
-            .clickable(interaction, indication = null, onClick = onClick)
+            .combinedClickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick,
+                onLongClick = onLongPress
+            )
     ) {
         Box {
             CoverArt(item, Modifier.width(artW).height(artH), corner = if (large || wide) 14 else 12)
