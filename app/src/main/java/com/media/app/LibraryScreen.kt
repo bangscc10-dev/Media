@@ -1,4 +1,5 @@
 package com.media.app
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -51,7 +52,7 @@ fun LibraryScreen(
             Modifier.fillMaxWidth().padding(Space.sm, Space.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClose) { Icon(Icons.Filled.ArrowBack, "Back", tint = MediaColors.Cream) }
+            IconButton(onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MediaColors.Cream) }
             Text("Library", style = MaterialTheme.typography.titleLarge, color = MediaColors.Cream)
         }
 

@@ -37,6 +37,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.outlined.LibraryBooks
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -160,6 +162,12 @@ private fun PermissionGate(onGrant: () -> Unit) {
     }
 }
 
+// Height of the bottom nav row (excludes the system nav-bar inset, which is
+// applied separately via navigationBarsPadding). The mini-player floats a
+// small gap above this — both derive from BottomBarHeight so they never drift.
+private val BottomBarHeight = 58.dp
+private val MiniPlayerGap = 8.dp
+
 @UnstableApi
 @Composable
 fun HomeScaffold(vm: PlayerViewModel) {
@@ -240,7 +248,7 @@ fun HomeScaffold(vm: PlayerViewModel) {
                 }
             }
 
-            item { Divider(color = MediaColors.InkHairline, modifier = Modifier.padding(horizontal = Space.xl)) }
+            item { HorizontalDivider(color = MediaColors.InkHairline, modifier = Modifier.padding(horizontal = Space.xl)) }
 
             if (music.isNotEmpty()) {
                 item {
@@ -278,7 +286,7 @@ fun HomeScaffold(vm: PlayerViewModel) {
             NowPlayingBar(
                 state, vm,
                 onExpand = { showPlayer = true },
-                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 66.dp, start = Space.md, end = Space.md)
+                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = BottomBarHeight + MiniPlayerGap, start = Space.md, end = Space.md)
             )
         }
         BottomBar(Modifier.align(Alignment.BottomCenter), onLibraryTab = { showLibrary = true }, onPodcastsTab = { showPodcasts = true }) { showAudiobooks = true }
@@ -544,14 +552,14 @@ private fun BottomBar(modifier: Modifier = Modifier, onLibraryTab: () -> Unit, o
             .navigationBarsPadding()
     ) {
         Row(
-            Modifier.fillMaxWidth().height(58.dp),
+            Modifier.fillMaxWidth().height(BottomBarHeight),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             NavTab(Icons.Filled.Home, "Home", true) {}
-            NavTab(Icons.Outlined.LibraryBooks, "Library", false) { onLibraryTab() }
+            NavTab(Icons.AutoMirrored.Outlined.LibraryBooks, "Library", false) { onLibraryTab() }
             NavTab(Icons.Outlined.Podcasts, "Podcasts", false) { onPodcastsTab() }
-            NavTab(Icons.Outlined.MenuBook, "Audiobooks", false) { onAudiobooksTab() }
+            NavTab(Icons.AutoMirrored.Outlined.MenuBook, "Audiobooks", false) { onAudiobooksTab() }
         }
     }
 }

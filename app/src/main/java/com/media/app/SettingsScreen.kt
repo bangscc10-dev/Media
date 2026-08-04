@@ -1,4 +1,5 @@
 package com.media.app
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -55,7 +56,7 @@ fun SettingsScreen(
             Modifier.fillMaxWidth().padding(Space.sm, Space.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClose) { Icon(Icons.Filled.ArrowBack, "Back", tint = MediaColors.Cream) }
+            IconButton(onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MediaColors.Cream) }
         }
 
         // Profile block

@@ -1,4 +1,5 @@
 package com.media.app
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,7 +44,7 @@ fun SearchScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClose) {
-                Icon(Icons.Filled.ArrowBack, "Back", tint = MediaColors.Cream)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MediaColors.Cream)
             }
             Row(
                 Modifier.weight(1f).clip(RoundedCornerShape(12.dp))

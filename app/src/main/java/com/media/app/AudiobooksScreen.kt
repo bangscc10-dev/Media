@@ -1,4 +1,6 @@
 package com.media.app
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,7 +33,7 @@ fun AudiobooksScreen(
             Modifier.fillMaxWidth().padding(Space.sm, Space.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClose) { Icon(Icons.Filled.ArrowBack, "Back", tint = MediaColors.Cream) }
+            IconButton(onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MediaColors.Cream) }
             Text("Audiobooks", style = MaterialTheme.typography.titleLarge, color = MediaColors.Cream)
         }
 
@@ -41,7 +43,7 @@ fun AudiobooksScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.padding(Space.xl)
                 ) {
-                    Icon(Icons.Outlined.MenuBook, null, tint = MediaColors.CreamFaint,
+                    Icon(Icons.AutoMirrored.Outlined.MenuBook, null, tint = MediaColors.CreamFaint,
                         modifier = Modifier.size(48.dp))
                     Spacer(Modifier.height(Space.lg))
                     Text("No audiobooks yet", style = MaterialTheme.typography.titleLarge,
