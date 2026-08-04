@@ -18,7 +18,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.media.app"
+        applicationId = "app.devbangs.media"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
