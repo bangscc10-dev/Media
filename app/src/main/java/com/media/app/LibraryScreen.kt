@@ -84,7 +84,7 @@ fun LibraryScreen(
                     style = MaterialTheme.typography.bodyLarge, color = MediaColors.CreamFaint)
             }
         } else {
-            LazyColumn(contentPadding = PaddingValues(bottom = 100.dp)) {
+            LazyColumn(contentPadding = PaddingValues(bottom = bottomSafePadding(gap = 100.dp))) {
                 items(shown.size) { idx ->
                     LibraryRow(
                         item = shown[idx],

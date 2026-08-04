@@ -6,6 +6,10 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -90,6 +94,15 @@ object Space {
     val xs = 4.dp; val sm = 8.dp; val md = 12.dp
     val lg = 16.dp; val xl = 22.dp; val xxl = 32.dp
 }
+
+/**
+ * Bottom content padding that clears the system navigation bar on any device
+ * (gesture pill or 3-button), plus a deliberate content [gap]. Single source of
+ * truth for list/grid bottom insets across every screen — no magic numbers.
+ */
+@Composable
+fun bottomSafePadding(gap: Dp = Space.xl): Dp =
+    gap + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
 @Composable
 fun MediaTheme(

@@ -49,7 +49,14 @@ fun EditSheet(
         containerColor = MediaColors.InkRaised,
         dragHandle = { BottomSheetDefaults.DragHandle(color = MediaColors.CreamFaint) }
     ) {
-        Column(Modifier.fillMaxWidth().padding(Space.xl, Space.sm, Space.xl, 40.dp)) {
+        // imePadding lifts the Save button above the keyboard when a field is
+        // focused. ModalBottomSheet already applies the navigation-bar inset,
+        // so we do NOT add navigationBarsPadding here (that would double-inset).
+        Column(
+            Modifier.fillMaxWidth()
+                .imePadding()
+                .padding(Space.xl, Space.sm, Space.xl, Space.xl)
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CoverArt(item, Modifier.size(56.dp), corner = 10)
                 Spacer(Modifier.width(Space.md))

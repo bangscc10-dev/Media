@@ -54,7 +54,7 @@ fun AudiobooksScreen(
         } else {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(Space.xl, Space.md, Space.xl, 40.dp),
+                contentPadding = PaddingValues(Space.xl, Space.md, Space.xl, bottomSafePadding()),
                 horizontalArrangement = Arrangement.spacedBy(Space.md),
                 verticalArrangement = Arrangement.spacedBy(Space.lg)
             ) {

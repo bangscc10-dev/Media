@@ -94,7 +94,7 @@ fun SettingsScreen(
             modifier = Modifier.padding(Space.xl))
         Text("All your media. One home.",
             style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamFaint,
-            modifier = Modifier.padding(start = Space.xl, bottom = 40.dp))
+            modifier = Modifier.padding(start = Space.xl).padding(bottom = bottomSafePadding()))
     }
 }
 

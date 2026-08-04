@@ -77,7 +77,7 @@ fun SearchScreen(
         when {
             query.isBlank() -> CenterHint("Find anything in your library")
             results.isEmpty() -> CenterHint("No results for \"$query\"")
-            else -> LazyColumn(contentPadding = PaddingValues(bottom = 40.dp)) {
+            else -> LazyColumn(contentPadding = PaddingValues(bottom = bottomSafePadding())) {
                 items(results) { item ->
                     val idx = results.indexOf(item)
                     SearchRow(item) { onPlay(results, idx) }
