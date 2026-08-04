@@ -113,6 +113,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     MediaMetadata.Builder()
                         .setTitle(item.title)
                         .setArtist(item.artist)
+                        .apply { item.artworkUri?.let { setArtworkUri(it) } }
                         .build()
                 )
                 .build()

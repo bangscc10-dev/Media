@@ -16,7 +16,8 @@ data class AppMediaItem(
     val uri: Uri,
     val type: MediaType,
     val pillar: Pillar,
-    val details: String? = null
+    val details: String? = null,
+    val artworkUri: Uri? = null
 )
 
 object MediaRepository {
@@ -49,7 +50,8 @@ object MediaRepository {
             MediaStore.Audio.Media.TITLE,
             MediaStore.Audio.Media.ARTIST,
             MediaStore.Audio.Media.DURATION,
-            MediaStore.Audio.Media.RELATIVE_PATH
+            MediaStore.Audio.Media.RELATIVE_PATH,
+            MediaStore.Audio.Media.ALBUM_ID
         )
         context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, projection, null, null,
@@ -60,18 +62,23 @@ object MediaRepository {
             val artistCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
             val durCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             val pathCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.RELATIVE_PATH)
+            val albumCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
+            val albumArtBase = Uri.parse("content://media/external/audio/albumart")
             while (c.moveToNext()) {
                 val id = c.getLong(idCol)
                 val title = c.getString(titleCol) ?: "Unknown"
                 val dur = c.getLong(durCol)
                 val relPath = c.getString(pathCol) ?: ""
+                val albumId = c.getLong(albumCol)
+                val artUri = android.content.ContentUris.withAppendedId(albumArtBase, albumId)
                 items += AppMediaItem(
                     id = id, title = title,
                     artist = c.getString(artistCol) ?: "Unknown",
                     durationMs = dur,
                     uri = Uri.withAppendedPath(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id.toString()),
                     type = MediaType.AUDIO,
-                    pillar = classifyAudio(title, relPath, dur)
+                    pillar = classifyAudio(title, relPath, dur),
+                    artworkUri = artUri
                 )
             }
         }
