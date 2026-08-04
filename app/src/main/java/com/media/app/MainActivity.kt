@@ -14,6 +14,12 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -91,15 +97,10 @@ private fun SetStatusBarIcons(darkTheme: Boolean) {
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            // Draw behind system bars
+            // Transparency + no-contrast-scrim now come from Theme.Media (applied
+            // before Compose mounts). Here we only keep what must react to the
+            // runtime theme: the light/dark system-bar ICON appearance.
             WindowCompat.setDecorFitsSystemWindows(window, false)
-            // Fully transparent bars so our app background fills edge-to-edge
-            window.statusBarColor = android.graphics.Color.TRANSPARENT
-            window.navigationBarColor = android.graphics.Color.TRANSPARENT
-            // Remove the forced contrast scrim the system draws on the nav bar (API 29+)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                window.isNavigationBarContrastEnforced = false
-            }
             val controller = WindowCompat.getInsetsController(window, view)
             // Dark theme -> light icons on both bars; Light theme -> dark icons
             controller.isAppearanceLightStatusBars = !darkTheme
@@ -219,8 +220,12 @@ fun HomeScaffold(vm: PlayerViewModel) {
     }
 
     Box(Modifier.fillMaxSize().background(MediaColors.Ink)) {
+        // Bottom inset = real nav-bar inset + chrome offset (bottom bar + mini-
+        // player), so the last shelf always clears the chrome on any device
+        // (gesture or 3-button). No magic number.
+        val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         LazyColumn(
-            contentPadding = PaddingValues(bottom = 170.dp),
+            contentPadding = PaddingValues(bottom = 170.dp + navBottom),
             modifier = Modifier.fillMaxSize().statusBarsPadding()
         ) {
             item { HomeHeader(onSearch = { showSearch = true }, onAccount = { showSettings = true }) }
@@ -582,25 +587,12 @@ private fun FullPlayer(state: PlayerState, vm: PlayerViewModel, onClose: () -> U
 
     Box(Modifier.fillMaxSize().background(MediaColors.Ink)) {
         Column(Modifier.fillMaxSize()) {
-            // Top bar with close — its own row, always tappable
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(Space.sm, Space.sm),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClose) {
-                    Icon(Icons.Filled.KeyboardArrowDown, "Close", tint = MediaColors.Cream,
-                        modifier = Modifier.size(28.dp))
-                }
-                Spacer(Modifier.weight(1f))
-                Text(if (state.isVideo) "Now playing" else "Now playing",
-                    style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamFaint)
-                Spacer(Modifier.weight(1f))
-                Spacer(Modifier.size(48.dp))
-            }
-
-            // Hero: video surface for video, big cover art for audio
+            // HERO — bleeds to the true top edge (behind the status bar). Video
+            // fills the surface; audio art is centered. Art has NO top inset:
+            // this is the edge-to-edge "wow" surface. Legibility of the status
+            // icons over the art is guaranteed by the scrim overlay below.
             Box(
-                Modifier.fillMaxWidth().weight(1f).padding(Space.xl, Space.md),
+                Modifier.fillMaxWidth().weight(1f),
                 contentAlignment = Alignment.Center
             ) {
                 if (state.isVideo) {
@@ -617,7 +609,37 @@ private fun FullPlayer(state: PlayerState, vm: PlayerViewModel, onClose: () -> U
                         modifier = Modifier.fillMaxWidth()
                     )
                 } else if (artItem != null) {
-                    CoverArt(artItem, Modifier.fillMaxWidth().aspectRatio(1f), corner = 18)
+                    CoverArt(artItem, Modifier.fillMaxWidth().aspectRatio(1f).padding(Space.xl), corner = 18)
+                }
+
+                // Top scrim: ink -> transparent, tall enough to cover the status
+                // bar zone. Keeps clock/battery legible over any album art.
+                Box(
+                    Modifier.fillMaxWidth().align(Alignment.TopCenter)
+                        .height(120.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                0f to MediaColors.Ink.copy(alpha = 0.55f),
+                                1f to Color.Transparent
+                            )
+                        )
+                )
+
+                // Close row floats over the art, inset below the status bar.
+                Row(
+                    Modifier.fillMaxWidth().align(Alignment.TopCenter)
+                        .statusBarsPadding().padding(Space.sm, Space.sm),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClose) {
+                        Icon(Icons.Filled.KeyboardArrowDown, "Close", tint = MediaColors.Cream,
+                            modifier = Modifier.size(28.dp))
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Text("Now playing",
+                        style = MaterialTheme.typography.bodyMedium, color = MediaColors.Cream)
+                    Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.size(48.dp))
                 }
             }
 
