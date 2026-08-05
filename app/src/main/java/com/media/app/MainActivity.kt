@@ -55,6 +55,13 @@ import android.widget.Toast
 import androidx.core.view.WindowCompat
 import android.app.Activity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import android.view.HapticFeedbackConstants
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import kotlin.math.roundToInt
 import androidx.compose.runtime.SideEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.collectAsState
@@ -581,7 +588,11 @@ private fun NavTab(icon: androidx.compose.ui.graphics.vector.ImageVector, label:
 @Composable
 private fun FullPlayer(state: PlayerState, vm: PlayerViewModel, onClose: () -> Unit) {
     val context = LocalContext.current
+    val view = LocalView.current
     var showSleepSheet by remember { mutableStateOf(false) }
+    val dragY = remember { Animatable(0f) }
+    val dragScope = rememberCoroutineScope()
+    val dragThresholdPx = with(androidx.compose.ui.platform.LocalDensity.current) { 150.dp.toPx() }
 
     // Lightweight item to drive CoverArt from the current URI.
     val artItem = state.currentUri?.let { uri ->
@@ -594,7 +605,27 @@ private fun FullPlayer(state: PlayerState, vm: PlayerViewModel, onClose: () -> U
         )
     }
 
-    Box(Modifier.fillMaxSize().background(MediaColors.Ink)) {
+    Box(
+        Modifier.fillMaxSize().background(MediaColors.Ink)
+            .offset { IntOffset(0, dragY.value.roundToInt()) }
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        if (dragY.value > dragThresholdPx) {
+                            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                            onClose()
+                            dragScope.launch { dragY.snapTo(0f) }
+                        } else {
+                            // Below threshold: spring back into place.
+                            dragScope.launch { dragY.animateTo(0f, spring()) }
+                        }
+                    },
+                    onVerticalDrag = { _, delta ->
+                        dragScope.launch { dragY.snapTo((dragY.value + delta).coerceAtLeast(0f)) }
+                    }
+                )
+            }
+    ) {
         Column(Modifier.fillMaxSize()) {
             // HERO — bleeds to the true top edge (behind the status bar). Video
             // fills the surface; audio art is centered. Art has NO top inset:
@@ -686,16 +717,16 @@ private fun FullPlayer(state: PlayerState, vm: PlayerViewModel, onClose: () -> U
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton({ vm.previous() }) { Icon(Icons.Filled.SkipPrevious, "Previous", tint = MediaColors.Cream, modifier = Modifier.size(34.dp)) }
+                IconButton({ view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP); vm.previous() }) { Icon(Icons.Filled.SkipPrevious, "Previous", tint = MediaColors.Cream, modifier = Modifier.size(34.dp)) }
                 Box(
                     Modifier.size(64.dp).clip(CircleShape).background(MediaColors.Cream)
-                        .clickable { vm.togglePlayPause() },
+                        .clickable { view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP); vm.togglePlayPause() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, "Play/Pause",
                         tint = MediaColors.OnInverse, modifier = Modifier.size(34.dp))
                 }
-                IconButton({ vm.next() }) { Icon(Icons.Filled.SkipNext, "Next", tint = MediaColors.Cream, modifier = Modifier.size(34.dp)) }
+                IconButton({ view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP); vm.next() }) { Icon(Icons.Filled.SkipNext, "Next", tint = MediaColors.Cream, modifier = Modifier.size(34.dp)) }
             }
 
             // Secondary row: shuffle / repeat / speed
