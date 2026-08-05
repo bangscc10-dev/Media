@@ -51,18 +51,26 @@ fun AboutScreen(version: String, onClose: () -> Unit) {
         Text("All your media. One home.", style = MaterialTheme.typography.bodyLarge,
             color = MediaColors.CreamDim, modifier = Modifier.padding(bottom = Space.xl))
 
-        Para("Media brings your music, podcasts, video, and audiobooks together into one calm, considered home — so your library stops feeling scattered across a dozen apps.")
-        Para("Everything plays locally from your device. No accounts, no tracking, no clutter.")
+        Para("Your library shouldn\'t be scattered across a dozen apps. Media gathers everything that plays on your phone into one calm, editorial home — and gets out of your way so you can just listen and watch.")
 
-        Heading("Version")
-        Para(version)
+        Heading("Four kinds of media, one place")
+        Para("Music for your songs. Podcasts for long-form talk. Audiobooks for the books you listen to. And video, in any format your phone understands. Media sorts them automatically, and you can always reorganize anything by hand.")
 
-        Heading("Built with")
-        Para("Kotlin, Jetpack Compose, and Media3. Type set in Fraunces and Inter.")
+        Heading("Yours, and only yours")
+        Para("Everything plays locally, straight from your device. There are no accounts to make, nothing to sign in to, and no ads. Media collects no data and tracks nothing — your library, your history, and your edits never leave your phone.")
 
-        Spacer(Modifier.height(Space.xl))
-        Text("All your media. One home.", style = MaterialTheme.typography.bodyMedium,
+        Heading("Made to feel calm")
+        Para("Ink and warm cream. A serif that reads like a magazine. Color comes from your album art, not from the app shouting for attention. Every screen is built to be quiet, considered, and pleasant to live in day after day.")
+
+        Heading("Little things that matter")
+        Para("A sleep timer that fades out gently. Audiobooks and podcasts that remember exactly where you stopped, and the speed you like them at. A now-playing screen you can pull down to dismiss. The details you\'d expect from a player that respects your time.")
+
+        Spacer(Modifier.height(Space.lg))
+        Text("Version $version", style = MaterialTheme.typography.bodyMedium,
             color = MediaColors.CreamFaint)
+        Spacer(Modifier.height(Space.sm))
+        Text("Made with care for people who love their media.",
+            style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamFaint)
     }
 }
 
