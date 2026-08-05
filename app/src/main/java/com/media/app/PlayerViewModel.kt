@@ -4,6 +4,8 @@ import android.app.Application
 import android.content.ComponentName
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.media3.common.MediaItem as ExoMediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -41,6 +43,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private var sleepDeadlineMs: Long? = null
     private var sleepEndOfTrack = false
     private var sleepFiring = false
+    // Resume-position support
+    private val db = OverrideDatabase.get(app)
+    private var pillarById: Map<Long, Pillar> = emptyMap()
+    private var lastPositionSaveMs = 0L
 
     // Set by the UI: called with the mediaId once it has played 5s (dedup handled by caller/DB).
     var onQualifyingPlay: ((Long) -> Unit)? = null
@@ -50,8 +56,12 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<PlayerState> = _state.asStateFlow()
 
     private val listener = object : Player.Listener {
-        override fun onIsPlayingChanged(isPlaying: Boolean) = refresh()
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (!isPlaying) saveCurrentPosition()   // capture position on pause
+            refresh()
+        }
         override fun onMediaItemTransition(mediaItem: ExoMediaItem?, reason: Int) {
+            saveCurrentPosition()                    // capture position before the item changes
             recordedForCurrent = false
             refresh()
         }
@@ -90,6 +100,16 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 tickSleepTimer()
+                // Throttled resume-position save (long-form only, ~every 5s).
+                controller?.let {
+                    if (it.isPlaying) {
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        if (now - lastPositionSaveMs >= 5000L) {
+                            lastPositionSaveMs = now
+                            saveCurrentPosition()
+                        }
+                    }
+                }
                 delay(500)
             }
         }
@@ -191,9 +211,54 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 )
                 .build()
         }
-        c.setMediaItems(exoItems, startIndex, 0L)
-        c.prepare()
-        c.play()
+        pillarById = items.associate { it.id to it.pillar }
+        val startItem = items[startIndex]
+        val longForm = startItem.pillar == Pillar.AUDIOBOOK || startItem.pillar == Pillar.PODCAST
+        if (longForm) {
+            // Read saved position off the main thread, then start at that offset.
+            viewModelScope.launch {
+                val saved = withContext(Dispatchers.IO) { db.positionDao().getOne(startItem.id) }
+                val resumeMs = resumeOffsetFor(saved)
+                c.setMediaItems(exoItems, startIndex, resumeMs)
+                c.prepare()
+                c.play()
+            }
+        } else {
+            c.setMediaItems(exoItems, startIndex, 0L)
+            c.prepare()
+            c.play()
+        }
+    }
+
+    // A saved position is worth resuming only if it's past the intro (>30s) and
+    // not within the last 30s of the item (so a nearly-finished book doesn't
+    // resume at the very end). Otherwise start from 0.
+    private fun resumeOffsetFor(p: PlaybackPosition?): Long {
+        if (p == null) return 0L
+        if (p.positionMs < 30_000L) return 0L
+        if (p.durationMs > 0 && p.positionMs > p.durationMs - 30_000L) return 0L
+        return p.positionMs
+    }
+
+    private fun currentIsLongForm(): Boolean {
+        val id = controller?.currentMediaItem?.localConfiguration?.uri?.lastPathSegment?.toLongOrNull()
+            ?: return false
+        val pillar = pillarById[id] ?: return false
+        return pillar == Pillar.AUDIOBOOK || pillar == Pillar.PODCAST
+    }
+
+    private fun saveCurrentPosition() {
+        val c = controller ?: return
+        if (!currentIsLongForm()) return
+        val id = c.currentMediaItem?.localConfiguration?.uri?.lastPathSegment?.toLongOrNull() ?: return
+        val pos = c.currentPosition
+        val dur = c.duration.coerceAtLeast(0L)
+        if (pos <= 0L) return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                db.positionDao().save(PlaybackPosition(id, pos, dur, System.currentTimeMillis()))
+            }
+        }
     }
 
     fun playOrToggle(items: List<AppMediaItem>, startIndex: Int) {

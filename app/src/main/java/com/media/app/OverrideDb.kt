@@ -22,6 +22,15 @@ data class PlayHistory(
     val lastPlayed: Long   // epoch millis
 )
 
+// Resume position for long-form items (audiobooks/podcasts). One row per file.
+@Entity(tableName = "playback_positions")
+data class PlaybackPosition(
+    @PrimaryKey val mediaId: Long,
+    val positionMs: Long,
+    val durationMs: Long,
+    val updatedAt: Long    // epoch millis
+)
+
 @Dao
 interface HistoryDao {
     @Upsert
@@ -32,6 +41,18 @@ interface HistoryDao {
 
     @Query("DELETE FROM play_history")
     suspend fun clear()
+}
+
+@Dao
+interface PositionDao {
+    @Upsert
+    suspend fun save(pos: PlaybackPosition)
+
+    @Query("SELECT * FROM playback_positions WHERE mediaId = :id LIMIT 1")
+    suspend fun getOne(id: Long): PlaybackPosition?
+
+    @Query("DELETE FROM playback_positions WHERE mediaId = :id")
+    suspend fun clearOne(id: Long)
 }
 
 @Dao
@@ -49,10 +70,11 @@ interface OverrideDao {
     suspend fun delete(id: Long)
 }
 
-@Database(entities = [MediaOverride::class, PlayHistory::class], version = 2, exportSchema = false)
+@Database(entities = [MediaOverride::class, PlayHistory::class, PlaybackPosition::class], version = 3, exportSchema = false)
 abstract class OverrideDatabase : RoomDatabase() {
     abstract fun dao(): OverrideDao
     abstract fun historyDao(): HistoryDao
+    abstract fun positionDao(): PositionDao
 
     companion object {
         @Volatile private var INSTANCE: OverrideDatabase? = null
@@ -68,13 +90,25 @@ abstract class OverrideDatabase : RoomDatabase() {
             }
         }
 
+        // v2 -> v3: add playback_positions table, preserve overrides + history.
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `playback_positions` " +
+                    "(`mediaId` INTEGER NOT NULL, `positionMs` INTEGER NOT NULL, " +
+                    "`durationMs` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+                    "PRIMARY KEY(`mediaId`))"
+                )
+            }
+        }
+
         fun get(context: Context): OverrideDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     OverrideDatabase::class.java,
                     "media_overrides.db"
-                ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
             }
     }
 }
