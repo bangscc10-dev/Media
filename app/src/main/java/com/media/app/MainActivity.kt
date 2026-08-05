@@ -27,6 +27,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.border
 import androidx.compose.foundation.lazy.LazyColumn
@@ -129,22 +130,90 @@ private fun requiredPermissions(): Array<String> =
 @Composable
 fun AppRoot(vm: PlayerViewModel = viewModel()) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var granted by remember {
         mutableStateOf(requiredPermissions().all {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         })
     }
+    val introSeen by SettingsStore.introSeenFlow(context).collectAsState(initial = null)
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result -> granted = result.values.all { it } }
 
-    LaunchedEffect(Unit) { if (!granted) launcher.launch(requiredPermissions()) }
+    // Local step for the first-run flow: 0 = welcome, 1 = permission explainer.
+    var onboardStep by remember { mutableStateOf(0) }
 
-    if (!granted) {
-        PermissionGate { launcher.launch(requiredPermissions()) }
-        return
+    when {
+        introSeen == null -> Box(Modifier.fillMaxSize().background(MediaColors.Ink))
+        introSeen == true && granted -> HomeScaffold(vm)
+        introSeen == true && !granted ->
+            PermissionGate { launcher.launch(requiredPermissions()) }
+        onboardStep == 0 -> WelcomePage(onContinue = { onboardStep = 1 })
+        else -> PermissionExplainerPage(onContinue = {
+            scope.launch { SettingsStore.setIntroSeen(context) }
+            launcher.launch(requiredPermissions())
+        })
     }
-    HomeScaffold(vm)
+}
+
+@Composable
+private fun WelcomePage(onContinue: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(MediaColors.Ink).systemBarsPadding().padding(Space.xl)) {
+        Column(Modifier.align(Alignment.CenterStart)) {
+            Text("Media", style = MaterialTheme.typography.displayLarge, color = MediaColors.Cream)
+            Spacer(Modifier.height(Space.md))
+            Text("All your media, one calm home.",
+                style = MaterialTheme.typography.titleLarge, color = MediaColors.CreamDim)
+            Spacer(Modifier.height(Space.xl))
+            WelcomeLine("Music, podcasts, audiobooks, and video — together.")
+            Spacer(Modifier.height(Space.md))
+            WelcomeLine("Everything plays locally. No accounts, no tracking.")
+            Spacer(Modifier.height(Space.md))
+            WelcomeLine("Calm, editorial, and quietly out of your way.")
+        }
+        Box(
+            Modifier.align(Alignment.BottomEnd)
+                .clip(RoundedCornerShape(30.dp)).background(MediaColors.Cream)
+                .clickable(onClick = onContinue)
+                .padding(horizontal = 28.dp, vertical = 14.dp)
+        ) {
+            Text("Got it", style = MaterialTheme.typography.titleMedium, color = MediaColors.Ink)
+        }
+    }
+}
+
+@Composable
+private fun WelcomeLine(text: String) {
+    Text(text, style = MaterialTheme.typography.bodyLarge, color = MediaColors.Cream)
+}
+
+@Composable
+private fun PermissionExplainerPage(onContinue: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(MediaColors.Ink).systemBarsPadding().padding(Space.xl)) {
+        Column(Modifier.align(Alignment.CenterStart)) {
+            Text("One quick thing", style = MaterialTheme.typography.displaySmall, color = MediaColors.Cream)
+            Spacer(Modifier.height(Space.lg))
+            Text(
+                "Media plays the songs, podcasts, audiobooks, and videos already on your phone. " +
+                "To find them, it needs permission to read your media.",
+                style = MaterialTheme.typography.bodyLarge, color = MediaColors.CreamDim
+            )
+            Spacer(Modifier.height(Space.md))
+            Text(
+                "Nothing leaves your device, and nothing is uploaded anywhere.",
+                style = MaterialTheme.typography.bodyLarge, color = MediaColors.CreamDim
+            )
+        }
+        Box(
+            Modifier.align(Alignment.BottomEnd)
+                .clip(RoundedCornerShape(30.dp)).background(MediaColors.Cream)
+                .clickable(onClick = onContinue)
+                .padding(horizontal = 28.dp, vertical = 14.dp)
+        ) {
+            Text("Understood", style = MaterialTheme.typography.titleMedium, color = MediaColors.Ink)
+        }
+    }
 }
 
 @Composable

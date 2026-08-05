@@ -2,6 +2,7 @@ package com.media.app
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -20,6 +21,7 @@ data class MediaSettings(
 object SettingsStore {
     private val THEME = stringPreferencesKey("theme_mode")
     private val FONT = floatPreferencesKey("font_scale")
+    private val INTRO_SEEN = booleanPreferencesKey("intro_seen")
 
     fun flow(context: Context): Flow<MediaSettings> =
         context.dataStore.data.map { p ->
@@ -40,5 +42,12 @@ object SettingsStore {
 
     suspend fun setFontScale(context: Context, scale: Float) {
         context.dataStore.edit { it[FONT] = scale }
+    }
+
+    fun introSeenFlow(context: Context): Flow<Boolean> =
+        context.dataStore.data.map { it[INTRO_SEEN] ?: false }
+
+    suspend fun setIntroSeen(context: Context) {
+        context.dataStore.edit { it[INTRO_SEEN] = true }
     }
 }
