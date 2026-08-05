@@ -27,12 +27,20 @@ data class PlayerState(
     val shuffle: Boolean = false,
     val repeatMode: Int = 0,   // Media3: 0=OFF, 1=ONE, 2=ALL
     val speed: Float = 1.0f,
-    val isVideo: Boolean = false
+    val isVideo: Boolean = false,
+    val sleepActive: Boolean = false,
+    val sleepRemainingMs: Long = 0L,
+    val sleepEndOfTrack: Boolean = false
 )
 
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     private var controller: MediaController? = null
+    // Sleep timer: countdown = absolute deadline (robust to tick jitter);
+    // end-of-track = flag watched in the position loop. Fade runs once.
+    private var sleepDeadlineMs: Long? = null
+    private var sleepEndOfTrack = false
+    private var sleepFiring = false
 
     // Set by the UI: called with the mediaId once it has played 5s (dedup handled by caller/DB).
     var onQualifyingPlay: ((Long) -> Unit)? = null
@@ -81,14 +89,76 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                         }
                     }
                 }
+                tickSleepTimer()
                 delay(500)
             }
+        }
+    }
+
+    // ---- Sleep timer ----
+
+    fun startSleepTimer(minutes: Int) {
+        sleepEndOfTrack = false
+        sleepDeadlineMs = android.os.SystemClock.elapsedRealtime() + minutes * 60_000L
+        sleepFiring = false
+        _state.value = _state.value.copy(sleepActive = true, sleepEndOfTrack = false, sleepRemainingMs = minutes * 60_000L)
+    }
+
+    fun startSleepEndOfTrack() {
+        sleepDeadlineMs = null
+        sleepEndOfTrack = true
+        sleepFiring = false
+        _state.value = _state.value.copy(sleepActive = true, sleepEndOfTrack = true, sleepRemainingMs = 0L)
+    }
+
+    fun cancelSleepTimer() {
+        sleepDeadlineMs = null
+        sleepEndOfTrack = false
+        sleepFiring = false
+        controller?.volume = 1f
+        _state.value = _state.value.copy(sleepActive = false, sleepEndOfTrack = false, sleepRemainingMs = 0L)
+    }
+
+    private fun tickSleepTimer() {
+        if (sleepFiring) return
+        val c = controller ?: return
+        val deadline = sleepDeadlineMs
+        if (deadline != null) {
+            val remaining = deadline - android.os.SystemClock.elapsedRealtime()
+            if (remaining <= 0L) { fireSleepTimer(); return }
+            _state.value = _state.value.copy(sleepRemainingMs = remaining)
+        } else if (sleepEndOfTrack) {
+            val dur = c.duration
+            if (dur > 0 && c.currentPosition >= dur - 10_000L) fireSleepTimer()
+        }
+    }
+
+    private fun fireSleepTimer() {
+        if (sleepFiring) return
+        sleepFiring = true
+        sleepDeadlineMs = null
+        sleepEndOfTrack = false
+        viewModelScope.launch {
+            val c = controller
+            if (c != null) {
+                val steps = 20
+                for (i in 1..steps) {
+                    if (!sleepFiring) return@launch
+                    c.volume = (1f - i.toFloat() / steps).coerceAtLeast(0f)
+                    delay(500)
+                }
+                c.pause()
+                c.volume = 1f
+            }
+            sleepFiring = false
+            _state.value = _state.value.copy(sleepActive = false, sleepEndOfTrack = false, sleepRemainingMs = 0L)
         }
     }
 
     private fun refresh() {
         val c = controller ?: return
         val md = c.mediaMetadata
+        val prev = _state.value   // preserve sleep-timer state across rebuilds
         _state.value = PlayerState(
             currentTitle = md.title?.toString() ?: "",
             currentArtist = md.artist?.toString() ?: "",
@@ -100,7 +170,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             shuffle = c.shuffleModeEnabled,
             repeatMode = c.repeatMode,
             speed = c.playbackParameters.speed,
-            isVideo = c.currentMediaItem?.localConfiguration?.uri?.toString()?.contains("/video/") == true
+            isVideo = c.currentMediaItem?.localConfiguration?.uri?.toString()?.contains("/video/") == true,
+            sleepActive = prev.sleepActive,
+            sleepRemainingMs = prev.sleepRemainingMs,
+            sleepEndOfTrack = prev.sleepEndOfTrack
         )
     }
 

@@ -581,6 +581,7 @@ private fun NavTab(icon: androidx.compose.ui.graphics.vector.ImageVector, label:
 @Composable
 private fun FullPlayer(state: PlayerState, vm: PlayerViewModel, onClose: () -> Unit) {
     val context = LocalContext.current
+    var showSleepSheet by remember { mutableStateOf(false) }
 
     // Lightweight item to drive CoverArt from the current URI.
     val artItem = state.currentUri?.let { uri ->
@@ -725,8 +726,82 @@ private fun FullPlayer(state: PlayerState, vm: PlayerViewModel, onClose: () -> U
                         style = MaterialTheme.typography.titleMedium,
                         color = if (state.speed != 1.0f) MediaColors.Accent else MediaColors.CreamDim)
                 }
+                // Sleep timer slot: inactive = moon; countdown = live mm:ss; end-of-track = accent moon.
+                Box(
+                    Modifier.clip(RoundedCornerShape(8.dp)).clickable { showSleepSheet = true }
+                        .padding(horizontal = Space.md, vertical = Space.xs),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when {
+                        state.sleepActive && !state.sleepEndOfTrack ->
+                            Text(fmtTime(state.sleepRemainingMs),
+                                style = MaterialTheme.typography.titleMedium, color = MediaColors.Accent)
+                        else ->
+                            Icon(Icons.Filled.Bedtime, "Sleep timer",
+                                tint = if (state.sleepActive) MediaColors.Accent else MediaColors.CreamDim,
+                                modifier = Modifier.size(22.dp))
+                    }
+                }
             }
         }
+    }
+
+    if (showSleepSheet) {
+        SleepTimerSheet(
+            state = state,
+            onPick = { minutes -> vm.startSleepTimer(minutes); showSleepSheet = false },
+            onEndOfTrack = { vm.startSleepEndOfTrack(); showSleepSheet = false },
+            onCancelTimer = { vm.cancelSleepTimer(); showSleepSheet = false },
+            onDismiss = { showSleepSheet = false }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SleepTimerSheet(
+    state: PlayerState,
+    onPick: (Int) -> Unit,
+    onEndOfTrack: () -> Unit,
+    onCancelTimer: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MediaColors.InkRaised,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = MediaColors.CreamFaint) }
+    ) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(Space.xl, Space.sm, Space.xl, Space.xl)) {
+            Text("Sleep timer", style = MaterialTheme.typography.titleLarge, color = MediaColors.Cream)
+            Spacer(Modifier.height(Space.lg))
+            listOf(15, 30, 45, 60).forEach { m ->
+                SleepRow("$m minutes", active = state.sleepActive && !state.sleepEndOfTrack) { onPick(m) }
+            }
+            SleepRow("End of current track", active = state.sleepEndOfTrack) { onEndOfTrack() }
+            if (state.sleepActive) {
+                Spacer(Modifier.height(Space.sm))
+                Box(
+                    Modifier.fillMaxWidth().clickable { onCancelTimer() }.padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Turn off timer", style = MaterialTheme.typography.bodyLarge, color = MediaColors.CreamDim)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SleepRow(label: String, active: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge,
+            color = if (active) MediaColors.Accent else MediaColors.Cream, modifier = Modifier.weight(1f))
+        if (active) Icon(Icons.Filled.Check, "Active", tint = MediaColors.Accent, modifier = Modifier.size(20.dp))
     }
 }
 
