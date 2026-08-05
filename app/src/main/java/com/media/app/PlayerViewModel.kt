@@ -221,11 +221,13 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 val resumeMs = resumeOffsetFor(saved)
                 c.setMediaItems(exoItems, startIndex, resumeMs)
                 c.prepare()
+                c.setPlaybackSpeed(saved?.speed ?: 1.0f)   // restore this item's speed
                 c.play()
             }
         } else {
             c.setMediaItems(exoItems, startIndex, 0L)
             c.prepare()
+            c.setPlaybackSpeed(1.0f)   // music always starts at 1x
             c.play()
         }
     }
@@ -253,10 +255,11 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         val id = c.currentMediaItem?.localConfiguration?.uri?.lastPathSegment?.toLongOrNull() ?: return
         val pos = c.currentPosition
         val dur = c.duration.coerceAtLeast(0L)
+        val spd = c.playbackParameters.speed
         if (pos <= 0L) return
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                db.positionDao().save(PlaybackPosition(id, pos, dur, System.currentTimeMillis()))
+                db.positionDao().save(PlaybackPosition(id, pos, dur, System.currentTimeMillis(), spd))
             }
         }
     }
@@ -329,6 +332,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         }
         c.setPlaybackSpeed(next)
         refresh()
+        saveCurrentPosition()   // persist the new speed for this item right away
     }
 
     override fun onCleared() {

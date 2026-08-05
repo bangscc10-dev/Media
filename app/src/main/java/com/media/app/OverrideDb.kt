@@ -28,7 +28,8 @@ data class PlaybackPosition(
     @PrimaryKey val mediaId: Long,
     val positionMs: Long,
     val durationMs: Long,
-    val updatedAt: Long    // epoch millis
+    val updatedAt: Long,   // epoch millis
+    val speed: Float = 1.0f // remembered playback speed for this item
 )
 
 @Dao
@@ -70,7 +71,7 @@ interface OverrideDao {
     suspend fun delete(id: Long)
 }
 
-@Database(entities = [MediaOverride::class, PlayHistory::class, PlaybackPosition::class], version = 3, exportSchema = false)
+@Database(entities = [MediaOverride::class, PlayHistory::class, PlaybackPosition::class], version = 4, exportSchema = false)
 abstract class OverrideDatabase : RoomDatabase() {
     abstract fun dao(): OverrideDao
     abstract fun historyDao(): HistoryDao
@@ -102,13 +103,22 @@ abstract class OverrideDatabase : RoomDatabase() {
             }
         }
 
+        // v3 -> v4: add speed column to playback_positions (default 1.0), data preserved.
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `playback_positions` ADD COLUMN `speed` REAL NOT NULL DEFAULT 1.0"
+                )
+            }
+        }
+
         fun get(context: Context): OverrideDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     OverrideDatabase::class.java,
                     "media_overrides.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { INSTANCE = it }
             }
     }
 }
