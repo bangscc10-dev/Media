@@ -37,19 +37,20 @@ fun PodcastsScreen(
         }
 
         if (podcasts.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.BiasAlignment(0f, -0.2f)) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.padding(Space.xl)
                 ) {
                     Icon(Icons.Outlined.Podcasts, null, tint = MediaColors.CreamFaint,
-                        modifier = Modifier.size(48.dp))
+                        modifier = Modifier.size(64.dp))
                     Spacer(Modifier.height(Space.lg))
                     Text("No podcasts yet", style = MaterialTheme.typography.titleLarge,
                         color = MediaColors.Cream)
                     Spacer(Modifier.height(Space.sm))
                     Text("Long audio, files named \"podcast,\" or anything in a Podcasts folder shows up here.",
-                        style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamDim)
+                        style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamDim,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
             }
         } else {

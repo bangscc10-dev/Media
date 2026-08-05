@@ -15,3 +15,4 @@
 # Signing — NEVER commit
 media-release.keystore
 keystore.properties
+.kotlin/

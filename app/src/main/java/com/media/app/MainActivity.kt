@@ -156,7 +156,8 @@ private fun PermissionGate(onGrant: () -> Unit) {
             Text(
                 "All your music, podcasts, video, and audiobooks in one home.",
                 style = MaterialTheme.typography.bodyLarge,
-                color = MediaColors.CreamDim
+                color = MediaColors.CreamDim,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
             Spacer(Modifier.height(Space.xl))
             Button(

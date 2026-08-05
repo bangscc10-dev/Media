@@ -38,19 +38,20 @@ fun AudiobooksScreen(
         }
 
         if (audiobooks.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.BiasAlignment(0f, -0.2f)) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.padding(Space.xl)
                 ) {
                     Icon(Icons.AutoMirrored.Outlined.MenuBook, null, tint = MediaColors.CreamFaint,
-                        modifier = Modifier.size(48.dp))
+                        modifier = Modifier.size(64.dp))
                     Spacer(Modifier.height(Space.lg))
                     Text("No audiobooks yet", style = MaterialTheme.typography.titleLarge,
                         color = MediaColors.Cream)
                     Spacer(Modifier.height(Space.sm))
                     Text("Files in an Audiobooks folder, or anything you mark as an audiobook, show up here.",
-                        style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamDim)
+                        style = MaterialTheme.typography.bodyMedium, color = MediaColors.CreamDim,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
             }
         } else {
