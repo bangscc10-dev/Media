@@ -114,7 +114,7 @@ fun EditSheet(
                 contentAlignment = Alignment.Center
             ) {
                 Text("Save", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MediaColors.Cream)
+                    color = MediaColors.OnAccent)
             }
 
             if (hasOverride) {

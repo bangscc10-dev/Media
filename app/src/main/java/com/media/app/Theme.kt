@@ -39,8 +39,8 @@ val DarkPalette = Palette(
     text = Color(0xFFF4EFE6),
     textDim = Color(0xFF9B968C),
     textFaint = Color(0xFF6F6B63),
-    accent = Color(0xFF7C5CFF),
-    onAccent = Color(0xFFF4EFE6),
+    accent = Color(0xFFF4EFE6),   // active state = text tone (no purple)
+    onAccent = Color(0xFF0B0B0F),  // label on a text-toned fill = bg tone
     onInverse = Color(0xFF0B0B0F)
 )
 
@@ -52,9 +52,9 @@ val LightPalette = Palette(
     text = Color(0xFF1A1814),      // near-black ink
     textDim = Color(0xFF6B655B),   // warm grey
     textFaint = Color(0xFF9C958A),
-    accent = Color(0xFF6A48E0),    // slightly deeper purple for contrast on light
-    onAccent = Color(0xFFFFFFFF),
-    onInverse = Color(0xFF1A1814)
+    accent = Color(0xFF1A1814),    // active state = ink (no purple)
+    onAccent = Color(0xFFF7F3EC),  // label on an ink fill = paper tone
+    onInverse = Color(0xFFF7F3EC)   // light paper: icon on the dark play button in light mode
 )
 
 // Current palette, provided via CompositionLocal so any composable can read it.
@@ -69,6 +69,7 @@ object MediaColors {
     val CreamDim @Composable get() = LocalPalette.current.textDim
     val CreamFaint @Composable get() = LocalPalette.current.textFaint
     val Accent @Composable get() = LocalPalette.current.accent
+    val OnAccent @Composable get() = LocalPalette.current.onAccent
     val OnInverse @Composable get() = LocalPalette.current.onInverse
 }
 
