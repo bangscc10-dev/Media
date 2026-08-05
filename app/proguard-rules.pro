@@ -12,6 +12,8 @@
 -keep class com.media.app.PlayHistory { *; }
 -keep class com.media.app.OverrideDao { *; }
 -keep class com.media.app.HistoryDao { *; }
+-keep class com.media.app.PlaybackPosition { *; }
+-keep class com.media.app.PositionDao { *; }
 -keep class com.media.app.OverrideDatabase { *; }
 
 # ---- SplashScreen (uses reflection for animated icon) ----
